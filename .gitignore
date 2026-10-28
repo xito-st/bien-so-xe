@@ -1,0 +1,19 @@
+# Môi trường và bí mật
+.env
+.env.*
+.venv/
+venv/
+node_modules/
+
+# Build và cache
+__pycache__/
+*.pyc
+dist/
+build/
+.cache/
+
+# IDE và hệ điều hành
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
