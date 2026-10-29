@@ -52,3 +52,4 @@ class SyncJob(Base):
     tao_luc: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
+

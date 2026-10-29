@@ -133,3 +133,4 @@ def export_audit_logs_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="audit-log.xlsx"'},
     )
+

@@ -384,3 +384,4 @@ def post_ngung_dung_ma_bien_tinh(
         "tinh_ma": m.tinh_ma,
         "dang_dung": m.dang_dung,
     }
+

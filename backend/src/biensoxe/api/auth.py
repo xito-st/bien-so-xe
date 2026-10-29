@@ -158,3 +158,4 @@ def quen_mat_khau_endpoint(
         lien_he=payload.lien_he,
         ip=get_client_ip(request),
     )
+

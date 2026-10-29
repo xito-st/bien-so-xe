@@ -42,3 +42,4 @@ def is_forgot_password_rate_limited(
             return True
 
     return False
+

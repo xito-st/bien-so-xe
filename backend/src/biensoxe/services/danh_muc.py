@@ -365,3 +365,4 @@ def update_ma_bien_tinh(
             chi_tiet={"dang_dung": item.dang_dung},
         )
         return item
+

@@ -59,3 +59,4 @@ def get_xuat_bao_cao(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="bao-cao-{code_lower}.xlsx"'},
     )
+

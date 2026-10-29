@@ -116,3 +116,4 @@ def get_xuat_tra_cuu_bien(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="tra-cuu-bien-so.xlsx"'},
     )
+

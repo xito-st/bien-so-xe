@@ -76,3 +76,4 @@ def check_password_expiration(
         should_warn=should_warn,
         days_remaining=max(0, days_remaining),
     )
+

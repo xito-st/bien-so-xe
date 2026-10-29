@@ -35,13 +35,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const data = await apiRequest<CurrentUser & { csrf_token?: string }>(
-        "/api/v1/auth/me"
-      );
+      const data = await apiRequest<{
+        csrf_token?: string;
+        user: CurrentUser & { yeu_cau_thiet_lap_2fa?: boolean };
+      }>("/api/v1/auth/me");
       if (data.csrf_token) {
         setCsrfToken(data.csrf_token);
       }
-      setUser(data);
+      const u = data.user;
+      setUser({
+        ...u,
+        totp_da_bat: !u.yeu_cau_thiet_lap_2fa,
+        can_thiet_lap_2fa: !!u.yeu_cau_thiet_lap_2fa,
+      });
     } catch {
       setUser(null);
     } finally {
@@ -76,3 +82,4 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
+

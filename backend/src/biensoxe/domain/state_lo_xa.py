@@ -48,3 +48,4 @@ def validate_lo_xa_transition(current: TrangThaiLoXa | str, target: TrangThaiLoX
         raise StateTransitionError(
             f"Không được phép chuyển trạng thái lô xã từ '{cur.value}' sang '{tgt.value}' (FR-046)."
         )
+

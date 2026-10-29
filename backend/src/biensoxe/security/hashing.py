@@ -46,3 +46,4 @@ def verify_dummy_password(plain_password: str) -> None:
     if _DUMMY_HASH is None:
         _DUMMY_HASH = hash_password("DummyPasswordForTimingProtection@2026!")
     verify_password(plain_password, _DUMMY_HASH)
+

@@ -100,3 +100,4 @@ def revoke_all_user_sessions(
         .where(PhienDangNhap.tai_khoan_id == tai_khoan_id, PhienDangNhap.huy_luc.is_(None))
         .values(huy_luc=current)
     )
+

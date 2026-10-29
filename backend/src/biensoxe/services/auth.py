@@ -151,8 +151,7 @@ def authenticate_user(
     # Kiểm tra 2FA cho Admin đã bật TOTP (FR-019, AC-13)
     if user.vai_tro == "ADMIN" and user.totp_da_bat and user.totp_secret_enc:
         if not ma_totp:
-            _register_failed_attempt(db, user, current, ip, hanh_dong="XAC_THUC_2FA")
-            db.commit()
+            # Chưa nhập mã: chỉ yêu cầu nhập, không tính vào bộ đếm khóa (FR-014)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Yêu cầu mã xác thực 2 lớp (TOTP hoặc mã khôi phục).",

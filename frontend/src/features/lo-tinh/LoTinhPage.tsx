@@ -447,3 +447,4 @@ export function LoTinhPage() {
     </div>
   );
 }
+

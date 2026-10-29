@@ -91,3 +91,4 @@ def configure_logging(level: int = logging.INFO) -> logging.Logger:
     logger.addHandler(handler)
     logger.propagate = False
     return logger
+

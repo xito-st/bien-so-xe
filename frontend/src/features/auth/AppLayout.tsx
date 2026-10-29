@@ -26,7 +26,7 @@ export function ChangePasswordModal({
         body: JSON.stringify({
           mat_khau_hien_tai: matKhauHienTai,
           mat_khau_moi: matKhauMoi,
-          xac_nhan_mat_khau_moi: xacNhanMatKhauMoi,
+          mat_khau_nhap_lai: xacNhanMatKhauMoi,
         }),
       });
       setStep4Success(true);
@@ -358,3 +358,4 @@ export function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

@@ -287,3 +287,4 @@ def export_search_bien_xlsx(
     wb.close()
     buf.seek(0)
     return buf.getvalue()
+

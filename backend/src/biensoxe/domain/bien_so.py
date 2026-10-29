@@ -95,3 +95,4 @@ def parse_and_validate_bien_so(
         ngoai_tinh=ngoai_tinh,
         canh_bao_ngoai_tinh=canh_bao_ngoai_tinh,
     )
+

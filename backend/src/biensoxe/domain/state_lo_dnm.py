@@ -40,3 +40,4 @@ def validate_lo_dnm_transition(
         raise StateTransitionError(
             f"Không được phép chuyển trạng thái lô đặt nhà máy từ '{cur.value}' sang '{tgt.value}' (FR-065)."
         )
+

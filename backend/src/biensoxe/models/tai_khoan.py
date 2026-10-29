@@ -142,3 +142,4 @@ class YeuCauCapLaiMK(Base):
         DateTime(timezone=True), nullable=False, default=utcnow, index=True
     )
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+

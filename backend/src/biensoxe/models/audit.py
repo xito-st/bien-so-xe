@@ -27,3 +27,4 @@ class AuditLog(Base):
     ket_qua: Mapped[str] = mapped_column(String(32), nullable=False)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     chi_tiet: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+

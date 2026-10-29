@@ -80,3 +80,4 @@ class MaBienTinh(Base):
         String(2), ForeignKey("tinh.ma", ondelete="RESTRICT"), nullable=False, index=True
     )
     dang_dung: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+

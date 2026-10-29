@@ -97,3 +97,4 @@ def verify_and_consume_recovery_code(
     rec.dung_luc = current
     db.flush()
     return True
+

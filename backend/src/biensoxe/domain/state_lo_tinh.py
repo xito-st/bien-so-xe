@@ -46,3 +46,4 @@ def validate_lo_tinh_transition(
         raise StateTransitionError(
             f"Không được phép chuyển trạng thái lô tỉnh từ '{cur.value}' sang '{tgt.value}' (FR-071)."
         )
+

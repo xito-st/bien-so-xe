@@ -27,3 +27,4 @@ def process_pending_sync_jobs(db: Session, limit: int = 100) -> int:
     if count > 0:
         db.commit()
     return count
+

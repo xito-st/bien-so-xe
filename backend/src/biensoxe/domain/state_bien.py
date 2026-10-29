@@ -62,3 +62,4 @@ def validate_bien_giao_transition(
         raise StateTransitionError(
             f"Không được phép chuyển trạng thái giao từ '{cur.value}' sang '{tgt.value}'."
         )
+

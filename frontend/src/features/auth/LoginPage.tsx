@@ -42,7 +42,7 @@ export function LoginPage() {
       await refreshUser();
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === "YEU_CAU_2FA") {
+        if (err.code === "YEU_CAU_2FA" || err.message.includes("mã xác thực 2 lớp (TOTP")) {
           setCan2fa(true);
           setError("Vui lòng nhập mã xác thực 2 yếu tố (TOTP hoặc mã khôi phục).");
         } else {

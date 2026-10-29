@@ -132,3 +132,4 @@ def get_current_scope(
         tinh_ma=user.tinh_ma,
         xa_ma=user.xa_ma,
     )
+

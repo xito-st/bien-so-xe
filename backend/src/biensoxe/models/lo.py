@@ -99,3 +99,4 @@ class LoLichSu(Base):
         DateTime(timezone=True), nullable=False, default=utcnow
     )
     ly_do: Mapped[str | None] = mapped_column(Text, nullable=True)
+

@@ -437,3 +437,4 @@ def export_report_xlsx(
     wb.close()
     buf.seek(0)
     return buf.getvalue()
+
