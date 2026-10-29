@@ -11,10 +11,20 @@ export function LoTinhPage() {
 
   const [newSoCv, setNewSoCv] = useState("");
   const [newBien, setNewBien] = useState("");
+  const [newMauSac, setNewMauSac] = useState("TRẮNG");
   const [rejectReason, setRejectReason] = useState("");
   const [errorPlatesMap, setErrorPlatesMap] = useState<Record<number, string>>(
     {}
   );
+
+  // Sửa / Xóa biển số và Xóa lô tỉnh (FR-071, FR-043)
+  const [editingPlate, setEditingPlate] = useState<any | null>(null);
+  const [editBienInput, setEditBienInput] = useState("");
+  const [editMauSac, setEditMauSac] = useState("TRẮNG");
+  const [editInlinePreview, setEditInlinePreview] = useState<any>(null);
+  const [editConfirmReorderOpen, setEditConfirmReorderOpen] = useState(false);
+  const [confirmDeletePlate, setConfirmDeletePlate] = useState<any | null>(null);
+  const [confirmDeleteLoOpen, setConfirmDeleteLoOpen] = useState(false);
 
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -38,6 +48,30 @@ export function LoTinhPage() {
     setSelectedIds([]);
     void loadLos();
   }, [tab]);
+
+  useEffect(() => {
+    if (!editBienInput.trim() || !selectedLo || !editingPlate) {
+      setEditInlinePreview(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiRequest("/api/v1/bien/kiem-tra", {
+          method: "POST",
+          body: JSON.stringify({
+            lo_id: selectedLo.id,
+            bien_so: editBienInput,
+            mau_sac: editMauSac,
+            exclude_bien_id: editingPlate.id,
+          }),
+        });
+        setEditInlinePreview(res);
+      } catch {
+        setEditInlinePreview(null);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [editBienInput, editMauSac, selectedLo, editingPlate]);
 
   const handleBulkApprove = async () => {
     setConfirmBulkOpen(false);
@@ -133,13 +167,81 @@ export function LoTinhPage() {
     try {
       await apiRequest(`/api/v1/lo/${selectedLo.id}/bien`, {
         method: "POST",
-        body: JSON.stringify({ bien_so: newBien.trim() }),
+        body: JSON.stringify({ bien_so: newBien.trim(), mau_sac: newMauSac }),
       });
       setNewBien("");
       await loadPlates(selectedLo.id);
       await loadLos();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Lỗi thêm biển.");
+    }
+  };
+
+  const handleOpenEditPlate = (p: any) => {
+    setEditingPlate(p);
+    setEditBienInput(p.bien_so_day_du);
+    setEditMauSac(p.mau_sac);
+    setEditInlinePreview(null);
+    setError("");
+  };
+
+  const handleSaveEditPlate = async (datLaiXacNhan = false) => {
+    if (!editingPlate || !selectedLo) return;
+    setError("");
+    setMsg("");
+    try {
+      await apiRequest(`/api/v1/bien/${editingPlate.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          bien_so: editBienInput.trim(),
+          mau_sac: editMauSac,
+          dat_lai_xac_nhan: datLaiXacNhan,
+        }),
+      });
+      setEditingPlate(null);
+      setEditConfirmReorderOpen(false);
+      setMsg(`Đã cập nhật biển số ${editBienInput.trim()} thành công.`);
+      await loadPlates(selectedLo.id);
+      await loadLos();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && !datLaiXacNhan) {
+        setEditConfirmReorderOpen(true);
+      } else {
+        setError(err instanceof ApiError ? err.message : "Lỗi sửa biển số.");
+      }
+    }
+  };
+
+  const handleDeletePlate = async () => {
+    if (!confirmDeletePlate || !selectedLo) return;
+    const plateId = confirmDeletePlate.id;
+    const plateNo = confirmDeletePlate.bien_so_day_du;
+    setConfirmDeletePlate(null);
+    setError("");
+    setMsg("");
+    try {
+      await apiRequest(`/api/v1/bien/${plateId}`, { method: "DELETE" });
+      setMsg(`Đã xóa biển số ${plateNo} khỏi lô.`);
+      await loadPlates(selectedLo.id);
+      await loadLos();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Lỗi xóa biển số.");
+    }
+  };
+
+  const handleDeleteLo = async () => {
+    if (!selectedLo) return;
+    setConfirmDeleteLoOpen(false);
+    setError("");
+    setMsg("");
+    try {
+      await apiRequest(`/api/v1/lo/${selectedLo.id}`, { method: "DELETE" });
+      setMsg(`Đã xóa lô ${selectedLo.ma_lo} thành công.`);
+      setSelectedLo(null);
+      setPlates([]);
+      await loadLos();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Lỗi xóa lô.");
     }
   };
 
@@ -274,6 +376,15 @@ export function LoTinhPage() {
                         Gửi duyệt
                       </button>
                     )}
+                  {selectedLo.loai === "TINH" && selectedLo.trang_thai === "Khởi tạo" && (
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => setConfirmDeleteLoOpen(true)}
+                    >
+                      Xóa lô
+                    </button>
+                  )}
                   {selectedLo.trang_thai === "Chờ phê duyệt" && (
                     <>
                       <button
@@ -328,46 +439,89 @@ export function LoTinhPage() {
                     onChange={(e) => setNewBien(e.target.value)}
                     required
                   />
+                  <select
+                    className="select"
+                    value={newMauSac}
+                    onChange={(e) => setNewMauSac(e.target.value)}
+                  >
+                    <option value="TRẮNG">Nền TRẮNG</option>
+                    <option value="VÀNG">Nền VÀNG</option>
+                    <option value="XANH">Nền XANH</option>
+                  </select>
                   <button type="submit" className="btn">
                     Thêm biển
                   </button>
                 </form>
               )}
 
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>STT</th>
-                    <th>MÃ LÔ</th>
-                    <th>ĐƠN VỊ</th>
-                    <th>LOẠI PHƯƠNG TIỆN</th>
-                    <th>MÀU SẮC</th>
-                    <th>BIỂN SỐ ĐẦY ĐỦ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {plates.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.stt}</td>
-                      <td>{p.ma_lo}</td>
-                      <td>{p.don_vi}</td>
-                      <td>{p.loai_pt}</td>
-                      <td>{p.mau_sac}</td>
-                      <td>
-                        <strong>{p.bien_so_day_du}</strong>
-                        {p.ngoai_tinh && (
-                          <span
-                            className="badge badge-warning"
-                            style={{ marginLeft: 6 }}
-                          >
-                            Ngoại tỉnh
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {(() => {
+                const canEdit =
+                  (selectedLo.loai === "TINH" &&
+                    ["Khởi tạo", "Từ chối", "Cho phép điều chỉnh"].includes(
+                      selectedLo.trang_thai
+                    )) ||
+                  (selectedLo.loai === "XA" &&
+                    selectedLo.trang_thai === "Cho phép điều chỉnh");
+                return (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>STT</th>
+                        <th>MÃ LÔ</th>
+                        <th>ĐƠN VỊ</th>
+                        <th>LOẠI PHƯƠNG TIỆN</th>
+                        <th>MÀU SẮC</th>
+                        <th>BIỂN SỐ ĐẦY ĐỦ</th>
+                        {canEdit && <th>THAO TÁC</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plates.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.stt}</td>
+                          <td>{p.ma_lo}</td>
+                          <td>{p.don_vi}</td>
+                          <td>{p.loai_pt}</td>
+                          <td>{p.mau_sac}</td>
+                          <td>
+                            <strong>{p.bien_so_day_du}</strong>
+                            {p.ngoai_tinh && (
+                              <span
+                                className="badge badge-warning"
+                                style={{ marginLeft: 6 }}
+                              >
+                                Ngoại tỉnh
+                              </span>
+                            )}
+                          </td>
+                          {canEdit && (
+                            <td>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  style={{ padding: "2px 8px", fontSize: 12 }}
+                                  onClick={() => handleOpenEditPlate(p)}
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger"
+                                  style={{ padding: "2px 8px", fontSize: 12 }}
+                                  onClick={() => setConfirmDeletePlate(p)}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
             </>
           )}
         </div>
@@ -444,6 +598,133 @@ export function LoTinhPage() {
           </div>
         </div>
       )}
+      {/* Modal Sửa Biển số (FR-071, FR-043) */}
+      {editingPlate && (
+        <div className="modal-backdrop">
+          <div className="modal-box" style={{ maxWidth: 480 }}>
+            <h3 style={{ marginTop: 0 }}>Sửa biển số trong lô (FR-071)</h3>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>
+                Biển số
+              </label>
+              <input
+                className="input"
+                style={{ width: "100%" }}
+                value={editBienInput}
+                onChange={(e) => setEditBienInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>
+                Nền biển / Màu sắc
+              </label>
+              <select
+                className="select"
+                style={{ width: "100%" }}
+                value={editMauSac}
+                onChange={(e) => setEditMauSac(e.target.value)}
+              >
+                <option value="TRẮNG">Nền TRẮNG, chữ và số ĐEN</option>
+                <option value="VÀNG">Nền VÀNG, chữ và số ĐEN</option>
+                <option value="XANH">Nền XANH, chữ và số TRẮNG</option>
+              </select>
+            </div>
+            {editInlinePreview && (
+              <div
+                style={{
+                  fontSize: 13,
+                  marginBottom: 12,
+                  padding: 8,
+                  background: "#f8fafc",
+                  borderRadius: 4,
+                }}
+              >
+                {editInlinePreview.hop_le ? (
+                  <span>
+                    Chuẩn hóa: <strong>{editInlinePreview.bien_so_day_du}</strong> | Loại PT:{" "}
+                    <strong>{editInlinePreview.loai_pt}</strong> | Màu sắc:{" "}
+                    <strong>{editInlinePreview.mau_sac}</strong>
+                    {editInlinePreview.ngoai_tinh && (
+                      <span
+                        style={{
+                          color: "var(--color-warning)",
+                          marginLeft: 8,
+                          fontWeight: 600,
+                        }}
+                      >
+                        (Cảnh báo: Biển ngoại tỉnh FR-038)
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--color-danger)" }}>
+                    {editInlinePreview.loi}
+                  </span>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setEditingPlate(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={
+                  !editBienInput.trim() ||
+                  (editInlinePreview && !editInlinePreview.hop_le)
+                }
+                onClick={() => void handleSaveEditPlate(false)}
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác nhận đặt lại khi Sửa biển (FR-036 mục d) */}
+      <ConfirmModal
+        open={editConfirmReorderOpen}
+        title="Xác nhận đặt lại biển số đã trả / thu hồi (FR-036 mục d)"
+        onConfirm={() => void handleSaveEditPlate(true)}
+        onCancel={() => setEditConfirmReorderOpen(false)}
+      >
+        <p>
+          Biển số này từng ở trạng thái Đã trả hoặc Thu hồi trong tỉnh. Bạn có xác nhận muốn đặt lại biển số này không?
+        </p>
+      </ConfirmModal>
+
+      {/* Modal Xác nhận xóa biển (FR-071, FR-043) */}
+      <ConfirmModal
+        open={!!confirmDeletePlate}
+        title="Xác nhận xóa biển số khỏi lô (FR-071)"
+        danger={true}
+        onConfirm={() => void handleDeletePlate()}
+        onCancel={() => setConfirmDeletePlate(null)}
+      >
+        <p>
+          Bạn có chắc chắn muốn xóa biển số <strong>{confirmDeletePlate?.bien_so_day_du}</strong> khỏi lô này không?
+        </p>
+      </ConfirmModal>
+
+      {/* Modal Xác nhận xóa toàn bộ lô (FR-071) */}
+      <ConfirmModal
+        open={confirmDeleteLoOpen}
+        title="Xác nhận xóa toàn bộ lô (FR-071)"
+        danger={true}
+        onConfirm={() => void handleDeleteLo()}
+        onCancel={() => setConfirmDeleteLoOpen(false)}
+      >
+        <p>
+          Lô <strong>{selectedLo?.ma_lo}</strong> đang ở trạng thái Khởi tạo. Khi xóa, toàn bộ biển số trong lô sẽ bị xóa và mã lô được giải phóng. Bạn có chắc chắn muốn xóa?
+        </p>
+      </ConfirmModal>
     </div>
   );
 }
