@@ -77,7 +77,10 @@ def create_app() -> FastAPI:
                 return FileResponse(str(candidate))
             index_file = STATIC_DIR / "index.html"
             if index_file.is_file():
-                return FileResponse(str(index_file))
+                return FileResponse(
+                    str(index_file),
+                    headers={"Cache-Control": "no-store, must-revalidate"},
+                )
             return JSONResponse(status_code=404, content={"detail": "Chưa build giao diện"})
 
     return app
