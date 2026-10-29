@@ -3,13 +3,15 @@ import csv
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
+import sys
 import unicodedata
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from biensoxe.config import PROJECT_ROOT, get_settings
-from biensoxe.db import get_session_factory, transaction
+from biensoxe.db import Base, get_engine, get_session_factory, transaction
+import biensoxe.models  # noqa: F401
 from biensoxe.models.audit import AuditLog
 from biensoxe.models.danh_muc import LoaiPT, NenBien, Tinh, XaPhuong
 from biensoxe.models.tai_khoan import PhienDangNhap, TaiKhoan
@@ -264,14 +266,23 @@ def create_audit_partitions(db: Session, months_ahead: int = 24) -> list[str]:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="biensoxe", description="CLI quản trị hệ thống biển số xe")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed", help="Nạp danh mục và khởi tạo 3.356 tài khoản")
     sub.add_parser("reset-admin", help="Khôi phục mật khẩu và 2FA của Admin theo quy trình vận hành")
     sub.add_parser("create-partitions", help="Khởi tạo các phân vùng tháng cho lưu trữ audit_log (≥ 24 tháng)")
+    serve_parser = sub.add_parser("serve", help="Khởi tạo DB (nếu cần) và chạy máy chủ Web")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Địa chỉ lắng nghe (mặc định 127.0.0.1)")
+    serve_parser.add_argument("--port", type=int, default=8000, help="Cổng lắng nghe (mặc định 8000)")
 
     args = parser.parse_args()
-    session_factory = get_session_factory()
+    engine = get_engine()
+    Base.metadata.create_all(bind=engine)
+    session_factory = get_session_factory(engine)
     with session_factory() as db:
         if args.command == "seed":
             seed_database(db)
@@ -282,6 +293,19 @@ def main() -> None:
         elif args.command == "create-partitions":
             parts = create_audit_partitions(db, months_ahead=24)
             print(f"Đã đảm bảo {len(parts)} phân vùng lưu trữ audit_log.")
+        elif args.command == "serve":
+            if db.scalar(select(Tinh).limit(1)) is None:
+                print("Khởi tạo dữ liệu danh mục và 3.356 tài khoản lần đầu...")
+                seed_database(db)
+                create_audit_partitions(db, months_ahead=24)
+                print("Hoàn tất khởi tạo dữ liệu ban đầu.")
+
+    if args.command == "serve":
+        import uvicorn
+
+        from biensoxe.main import create_app
+
+        uvicorn.run(create_app(), host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
