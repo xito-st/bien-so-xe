@@ -295,3 +295,42 @@ def test_sync_retry_idempotent_ac29(authenticated_clients):
     assert r_retry.json()["trang_thai"] == "Chờ phê duyệt"
     assert r_retry.json()["trang_thai_dong_bo"] == "DA_DONG_BO"
     assert len(xa_client.get(f"/api/v1/lo/{lo_id}/bien").json()["items"]) == 1
+
+
+def test_excel_import_with_color_selection(authenticated_clients):
+    """Kiểm tra import tệp Excel mẫu mới có cột MÀU SẮC (TRẮNG, VÀNG, XANH) (FR-042)."""
+    xa_client = authenticated_clients["xa_10105001"]
+    lo = xa_client.post(
+        "/api/v1/lo", json={"loai": "XA", "so_cong_van": "CV-MAUSAC-01"}
+    ).json()
+    lo_id = lo["id"]
+
+    # Tạo tệp Excel 3 cột: BIỂN SỐ ĐẦY ĐỦ, MÀU SẮC, GHI CHÚ
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["BIỂN SỐ ĐẦY ĐỦ", "MÀU SẮC", "GHI CHÚ"])
+    ws.append(["30A-888.88", "TRẮNG", "Xe cá nhân"])
+    ws.append(["30E-888.88", "VÀNG", "Xe kinh doanh"])
+    ws.append(["30A-008.88", "XANH", "Xe cơ quan"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    r = xa_client.post(
+        f"/api/v1/lo/{lo_id}/bien/import",
+        files={
+            "file": (
+                "import_colors.xlsx",
+                buf.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["so_luong_them"] == 3
+
+    plates = xa_client.get(f"/api/v1/lo/{lo_id}/bien").json()["items"]
+    plates_by_no = {p["bien_so_day_du"]: p for p in plates}
+    assert plates_by_no["30A-888.88"]["mau_sac"] == "TRẮNG"
+    assert plates_by_no["30E-888.88"]["mau_sac"] == "VÀNG"
+    assert plates_by_no["30A-008.88"]["mau_sac"] == "XANH"
+

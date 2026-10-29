@@ -26,11 +26,74 @@ MAX_XLSX_BYTES = 5 * 1024 * 1024
 MAX_IMPORT_ROWS = 5000
 
 
-def _validate_and_read_xlsx_rows(file_bytes: bytes, filename: str) -> list[tuple[int, str, str]]:
+def _inspect_headers(header_cells: tuple | list) -> tuple[int, int, int]:
+    """
+    Xác định vị trí các cột: (plate_idx, color_idx, note_idx).
+    Trả về -1 nếu không có cột tương ứng.
+    """
+    plate_idx = 0
+    color_idx = -1
+    note_idx = -1
+
+    headers_upper = [
+        str(c).strip().upper() if c is not None else "" for c in header_cells
+    ]
+
+    for i, h in enumerate(headers_upper):
+        if not h:
+            continue
+        if any(kw in h for kw in ["BIỂN", "BIEN", "PLATE"]):
+            plate_idx = i
+        elif any(kw in h for kw in ["MÀU", "MAU", "NỀN", "NEN", "COLOR"]):
+            color_idx = i
+        elif any(kw in h for kw in ["GHI CHÚ", "GHI CHU", "NOTE", "MÔ TẢ", "MO TA"]):
+            note_idx = i
+
+    # Fallback nếu không khớp từ khóa:
+    if color_idx == -1 and len(headers_upper) >= 3 and plate_idx == 0:
+        if note_idx != 1:
+            color_idx = 1
+        if note_idx == -1:
+            note_idx = 2
+    elif note_idx == -1 and len(headers_upper) == 2 and plate_idx == 0:
+        note_idx = 1
+
+    return plate_idx, color_idx, note_idx
+
+
+def normalize_mau_sac(raw_color: str | None, note: str | None = None) -> str:
+    """
+    Chuẩn hóa màu sắc / nền biển:
+    - TRẮNG: "TRẮNG"
+    - VÀNG: "VÀNG"
+    - XANH: "XANH"
+    Mặc định là TRẮNG.
+    """
+    if raw_color:
+        c = raw_color.strip().upper()
+        if any(k in c for k in ["VÀNG", "VANG", "YELLOW"]):
+            return "VÀNG"
+        if any(k in c for k in ["XANH", "BLUE"]):
+            return "XANH"
+        if any(k in c for k in ["TRẮNG", "TRANG", "WHITE"]):
+            return "TRẮNG"
+        return raw_color.strip()
+    if note:
+        c = note.strip().upper()
+        if any(k in c for k in ["NỀN VÀNG", "MÀU VÀNG", "BIỂN VÀNG", "NEN VANG"]):
+            return "VÀNG"
+        if any(k in c for k in ["NỀN XANH", "MÀU XANH", "BIỂN XANH", "NEN XANH"]):
+            return "XANH"
+    return "TRẮNG"
+
+
+def _validate_and_read_xlsx_rows(
+    file_bytes: bytes, filename: str
+) -> list[tuple[int, str, str, str]]:
     """
     Kiểm tra an toàn tệp .xlsx (kích thước <= 5MB, từ chối macro vbaProject.bin,
     đọc bằng openpyxl read_only=True, data_only=True, tối đa 5.000 dòng) (FR-042, NFR-009).
-    Trả về danh sách (excel_row_number, raw_plate, note).
+    Trả về danh sách (excel_row_number, raw_plate, raw_color, note).
     """
     if not filename.lower().endswith(".xlsx"):
         raise HTTPException(
@@ -69,15 +132,41 @@ def _validate_and_read_xlsx_rows(file_bytes: bytes, filename: str) -> list[tuple
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Tệp Excel không có trang tính nào.",
             )
-        rows_out: list[tuple[int, str, str]] = []
+        rows_out: list[tuple[int, str, str, str]] = []
+        plate_col = 0
+        color_col = -1
+        note_col = -1
+
         for idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
             if idx == 1:
+                plate_col, color_col, note_col = _inspect_headers(row)
                 continue  # Bỏ qua dòng tiêu đề
             if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
-            raw_plate = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
-            note = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
-            rows_out.append((idx, raw_plate, note))
+
+            raw_plate = (
+                str(row[plate_col]).strip()
+                if 0 <= plate_col < len(row) and row[plate_col] is not None
+                else ""
+            )
+            raw_color = (
+                str(row[color_col]).strip()
+                if 0 <= color_col < len(row) and row[color_col] is not None
+                else ""
+            )
+            note = (
+                str(row[note_col]).strip()
+                if 0 <= note_col < len(row) and row[note_col] is not None
+                else ""
+            )
+
+            if not raw_plate:
+                if not note and not raw_color:
+                    continue
+                rows_out.append((idx, "", raw_color, note))
+                continue
+
+            rows_out.append((idx, raw_plate, raw_color, note))
             if len(rows_out) > MAX_IMPORT_ROWS:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -95,15 +184,41 @@ def _validate_and_read_xlsx_rows(file_bytes: bytes, filename: str) -> list[tuple
 
 
 def generate_lo_bien_template_xlsx() -> bytes:
-    """Sinh tệp mẫu .xlsx nhập danh sách biển số (FR-042)."""
+    """Sinh tệp mẫu .xlsx nhập danh sách biển số có chọn màu sắc (FR-042)."""
     buf = io.BytesIO()
-    wb = xlsxwriter.Workbook(buf, {"in_memory": True, "constant_memory": True})
+    wb = xlsxwriter.Workbook(buf, {"in_memory": True})
     ws = wb.add_worksheet("MauNhapBienSo")
-    header_fmt = wb.add_format({"bold": True, "bg_color": "#D9E1F2", "border": 1})
+    header_fmt = wb.add_format({
+        "bold": True,
+        "bg_color": "#D9E1F2",
+        "border": 1,
+        "align": "center",
+        "valign": "vcenter",
+    })
+    text_fmt = wb.add_format({"num_format": "@", "border": 1})
+    center_fmt = wb.add_format({"num_format": "@", "align": "center", "border": 1})
+    note_fmt = wb.add_format({"border": 1})
+
+    ws.set_row(0, 26)
     ws.write(0, 0, "BIỂN SỐ ĐẦY ĐỦ", header_fmt)
-    ws.write(0, 1, "GHI CHÚ", header_fmt)
-    ws.set_column(0, 0, 24)
-    ws.set_column(1, 1, 36)
+    ws.write(0, 1, "MÀU SẮC", header_fmt)
+    ws.write(0, 2, "GHI CHÚ", header_fmt)
+
+    ws.set_column(0, 0, 24, text_fmt)
+    ws.set_column(1, 1, 18, center_fmt)
+    ws.set_column(2, 2, 36, note_fmt)
+
+    # Thêm danh sách chọn (Dropdown data validation) cho cột B: MÀU SẮC từ dòng 2 đến dòng 5000
+    ws.data_validation(
+        "B2:B5000",
+        {
+            "validate": "list",
+            "source": ["TRẮNG", "VÀNG", "XANH"],
+            "error_title": "Màu sắc không hợp lệ",
+            "error_message": "Vui lòng chọn một trong ba màu: TRẮNG, VÀNG hoặc XANH.",
+        },
+    )
+
     wb.close()
     buf.seek(0)
     return buf.getvalue()
@@ -134,7 +249,7 @@ def import_plates_to_lo_xlsx(
     prepared_items: list[dict] = []
     seen_in_file: dict[str, int] = {}
 
-    for excel_row, raw_plate, note in raw_rows:
+    for excel_row, raw_plate, raw_color, note in raw_rows:
         if not raw_plate:
             errors.append(
                 {
@@ -145,8 +260,11 @@ def import_plates_to_lo_xlsx(
             )
             continue
 
+        selected_color = normalize_mau_sac(raw_color, note)
         try:
-            meta = resolve_plate_metadata(db, raw_plate, lo.tinh_ma)
+            meta = resolve_plate_metadata(
+                db, raw_plate, lo.tinh_ma, nen_bien=selected_color
+            )
         except BienSoValidationError as exc:
             errors.append(
                 {
@@ -383,7 +501,7 @@ def import_factory_return_xlsx(
     matched_plates: list[Bien] = []
     seen_in_file: dict[str, int] = {}
 
-    for excel_row, raw_plate, _note in raw_rows:
+    for excel_row, raw_plate, *tail in raw_rows:
         norm = normalize_raw_bien_so(raw_plate)
         if not norm:
             errors.append(

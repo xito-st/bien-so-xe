@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { ApiError, apiRequest } from "../../api/client";
 import { ConfirmModal, StatusBadge } from "../../components/ConfirmModal";
 
@@ -30,6 +30,8 @@ export function LoTinhPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadLos = async () => {
     const loai = tab === "LO_XA" ? "XA" : "TINH";
@@ -245,6 +247,28 @@ export function LoTinhPage() {
     }
   };
 
+  const handleImportExcel = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedLo) return;
+    setError("");
+    setMsg("");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await apiRequest<{ so_luong_them: number; so_luong_trung: number }>(
+        `/api/v1/lo/${selectedLo.id}/bien/import`,
+        { method: "POST", body: formData }
+      );
+      setMsg(`Đã import ${res.so_luong_them ?? 0} biển số thành công.`);
+      await loadPlates(selectedLo.id);
+      await loadLos();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Lỗi import Excel.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div>
       <h2>Duyệt Lô Xã trực thuộc & Quản lý Lô Tỉnh (FR-047, FR-049, FR-061, FR-062, FR-071)</h2>
@@ -431,27 +455,50 @@ export function LoTinhPage() {
               {(selectedLo.trang_thai === "Cho phép điều chỉnh" ||
                 (selectedLo.loai === "TINH" &&
                   ["Khởi tạo", "Từ chối"].includes(selectedLo.trang_thai))) && (
-                <form onSubmit={handleAddBienToLo} className="toolbar">
-                  <input
-                    className="input"
-                    placeholder="Thêm biển số vào lô (VD: 30A-123.45)"
-                    value={newBien}
-                    onChange={(e) => setNewBien(e.target.value)}
-                    required
-                  />
-                  <select
-                    className="select"
-                    value={newMauSac}
-                    onChange={(e) => setNewMauSac(e.target.value)}
+                <div className="toolbar" style={{ flexWrap: "wrap", alignItems: "center" }}>
+                  <form onSubmit={handleAddBienToLo} style={{ display: "inline-flex", gap: 8 }}>
+                    <input
+                      className="input"
+                      placeholder="Thêm biển số vào lô (VD: 30A-123.45)"
+                      value={newBien}
+                      onChange={(e) => setNewBien(e.target.value)}
+                      required
+                    />
+                    <select
+                      className="select"
+                      value={newMauSac}
+                      onChange={(e) => setNewMauSac(e.target.value)}
+                    >
+                      <option value="TRẮNG">Nền TRẮNG</option>
+                      <option value="VÀNG">Nền VÀNG</option>
+                      <option value="XANH">Nền XANH</option>
+                    </select>
+                    <button type="submit" className="btn">
+                      Thêm biển
+                    </button>
+                  </form>
+                  <a
+                    href="/api/v1/import/file-mau.xlsx"
+                    className="btn btn-secondary"
+                    download="mau-nhap-bien-so.xlsx"
                   >
-                    <option value="TRẮNG">Nền TRẮNG</option>
-                    <option value="VÀNG">Nền VÀNG</option>
-                    <option value="XANH">Nền XANH</option>
-                  </select>
-                  <button type="submit" className="btn">
-                    Thêm biển
+                    Tải file mẫu (.xlsx)
+                  </a>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Import Excel (.xlsx)
                   </button>
-                </form>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx"
+                    style={{ display: "none" }}
+                    onChange={handleImportExcel}
+                  />
+                </div>
               )}
 
               {(() => {
