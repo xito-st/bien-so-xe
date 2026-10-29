@@ -370,7 +370,7 @@ export function LoTinhPage() {
                   <td>
                     <strong>{l.ma_lo}</strong>
                   </td>
-                  <td>{l.don_vi || l.xa_ma || l.tinh_ma}</td>
+                  <td>{l.don_vi || l.don_vi_ten || l.xa_ten || l.tinh_ten || l.xa_ma || l.tinh_ma}</td>
                   <td>
                     <StatusBadge status={l.trang_thai} />
                   </td>
@@ -527,8 +527,8 @@ export function LoTinhPage() {
                         <tr key={p.id}>
                           <td>{p.stt}</td>
                           <td>{p.ma_lo}</td>
-                          <td>{p.don_vi}</td>
-                          <td>{p.loai_pt}</td>
+                          <td>{p.don_vi || p.don_vi_ten || p.xa_ten || p.tinh_ten || "-"}</td>
+                          <td>{p.loai_pt || p.loai_pt_ten || "-"}</td>
                           <td>{p.mau_sac}</td>
                           <td>
                             <strong>{p.bien_so_day_du}</strong>

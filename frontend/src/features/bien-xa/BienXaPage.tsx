@@ -153,7 +153,7 @@ export function BienXaPage() {
                   <strong>{b.bien_so_day_du}</strong>
                 </td>
                 <td>{b.ma_lo}</td>
-                <td>{b.loai_pt}</td>
+                <td>{b.loai_pt || b.loai_pt_ten || "-"}</td>
                 <td>{b.mau_sac}</td>
                 <td>{b.so_bien_ban || "—"}</td>
                 <td>{b.ngay_nhan || "—"}</td>

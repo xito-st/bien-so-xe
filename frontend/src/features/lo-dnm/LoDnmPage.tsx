@@ -266,8 +266,8 @@ export function LoDnmPage() {
                     <tr key={p.id}>
                       <td>{p.stt}</td>
                       <td>{p.ma_lo}</td>
-                      <td>{p.don_vi}</td>
-                      <td>{p.loai_pt}</td>
+                      <td>{p.don_vi || p.don_vi_ten || "-"}</td>
+                      <td>{p.loai_pt || p.loai_pt_ten || "-"}</td>
                       <td>{p.mau_sac}</td>
                       <td>
                         <strong>{p.bien_so_day_du}</strong>

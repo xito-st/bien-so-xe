@@ -233,11 +233,11 @@ export function TraCuuPage() {
                 <td>{item.stt}</td>
                 <td>{item.ma_lo}</td>
                 <td>{item.ma_lo_dat_nha_may || "—"}</td>
-                <td>{item.don_vi}</td>
+                <td>{item.don_vi || item.don_vi_ten || "-"}</td>
                 <td>
                   <strong>{item.bien_so_day_du}</strong>
                 </td>
-                <td>{item.loai_pt}</td>
+                <td>{item.loai_pt || item.loai_pt_ten || "-"}</td>
                 <td>{item.mau_sac}</td>
                 <td>
                   <StatusBadge status={item.trang_thai_lo} />

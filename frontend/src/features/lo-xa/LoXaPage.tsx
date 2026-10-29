@@ -17,8 +17,10 @@ interface BienItem {
   id: number;
   stt: number;
   ma_lo: string;
-  don_vi: string;
-  loai_pt: string;
+  don_vi?: string;
+  don_vi_ten?: string;
+  loai_pt?: string;
+  loai_pt_ten?: string;
   mau_sac: string;
   bien_so_day_du: string;
   ngoai_tinh: boolean;
@@ -546,8 +548,8 @@ export function LoXaPage() {
                             <tr key={p.id}>
                               <td>{p.stt}</td>
                               <td>{p.ma_lo}</td>
-                              <td>{p.don_vi}</td>
-                              <td>{p.loai_pt}</td>
+                              <td>{p.don_vi || p.don_vi_ten || "-"}</td>
+                              <td>{p.loai_pt || p.loai_pt_ten || "-"}</td>
                               <td>{p.mau_sac}</td>
                               <td>
                                 <strong>{p.bien_so_day_du}</strong>

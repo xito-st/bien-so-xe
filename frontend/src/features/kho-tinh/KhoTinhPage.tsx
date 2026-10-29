@@ -393,8 +393,8 @@ export function KhoTinhPage() {
                         <strong>{p.bien_so_day_du}</strong>
                       </td>
                       <td>{p.ma_lo}</td>
-                      <td>{p.don_vi}</td>
-                      <td>{p.loai_pt}</td>
+                      <td>{p.don_vi || p.don_vi_ten || "-"}</td>
+                      <td>{p.loai_pt || p.loai_pt_ten || "-"}</td>
                       <td>{p.mau_sac}</td>
                       <td>
                         <StatusBadge status={p.tinh_trang} />

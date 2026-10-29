@@ -331,8 +331,12 @@ def serialize_bien(
     lo = lo_map.get(b.lo_id) if lo_map else db.get(Lo, b.lo_id)
     lp = loai_pt_map.get(b.loai_pt_id) if loai_pt_map else db.get(LoaiPT, b.loai_pt_id)
     nb = nen_bien_map.get(b.nen_bien_id) if nen_bien_map else db.get(NenBien, b.nen_bien_id)
-    tinh = tinh_map.get(b.tinh_ma) if tinh_map else db.get(Tinh, b.tinh_ma)
-    xa = (xa_map.get(b.xa_ma) if xa_map else db.get(XaPhuong, b.xa_ma)) if b.xa_ma else None
+
+    tinh_code = b.tinh_ma or (lo.tinh_ma if lo else None)
+    xa_code = b.xa_ma or (lo.xa_ma if lo else None)
+
+    tinh = (tinh_map.get(tinh_code) if tinh_map else db.get(Tinh, tinh_code)) if tinh_code else None
+    xa = (xa_map.get(xa_code) if xa_map else db.get(XaPhuong, xa_code)) if xa_code else None
 
     ma_lo_dat_nha_may = None
     if lo and lo.lo_cha_id:
@@ -343,6 +347,9 @@ def serialize_bien(
         )
         if parent:
             ma_lo_dat_nha_may = parent.ma_lo
+
+    don_vi_name = xa.ten if xa else (tinh.ten if tinh else "")
+    loai_pt_name = lp.ten if lp else ""
 
     return {
         "id": b.id,
@@ -358,16 +365,18 @@ def serialize_bien(
         "seri_so": b.seri_so,
         "dau_so": b.dau_so,
         "loai_pt_id": b.loai_pt_id,
-        "loai_pt_ten": lp.ten if lp else None,
+        "loai_pt_ten": loai_pt_name,
+        "loai_pt": loai_pt_name,
         "nen_bien_id": b.nen_bien_id,
         "nen_bien_ten": nb.ten if nb else None,
         "mau_sac": nb.mau_sac if nb else None,
         "ghi_chu": b.ghi_chu,
-        "tinh_ma": b.tinh_ma,
+        "tinh_ma": tinh_code,
         "tinh_ten": tinh.ten if tinh else None,
-        "xa_ma": b.xa_ma,
+        "xa_ma": xa_code,
         "xa_ten": xa.ten if xa else None,
-        "don_vi_ten": xa.ten if xa else (tinh.ten if tinh else None),
+        "don_vi_ten": don_vi_name,
+        "don_vi": don_vi_name,
         "tinh_trang": b.tinh_trang,
         "giao": b.giao,
         "ngay_gio_tra": b.ngay_gio_tra.isoformat() if b.ngay_gio_tra else None,
@@ -415,6 +424,11 @@ def list_plates_in_lo(db: Session, scope: ScopeFilter, *, lo_id: int) -> list[di
     nb_map = {nb.id: nb for nb in db.scalars(select(NenBien)).all()}
     tinh_map = {t.ma: t for t in db.scalars(select(Tinh)).all()}
     xa_ids = {p.xa_ma for p in plates if p.xa_ma}
+    if lo.xa_ma:
+        xa_ids.add(lo.xa_ma)
+    for c in lo_map.values():
+        if c.xa_ma:
+            xa_ids.add(c.xa_ma)
     xa_map = (
         {x.ma: x for x in db.scalars(select(XaPhuong).where(XaPhuong.ma.in_(xa_ids))).all()}
         if xa_ids

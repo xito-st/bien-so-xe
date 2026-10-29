@@ -106,6 +106,7 @@ def serialize_lo(db: Session, lo: Lo) -> dict:
         "xa_ma": lo.xa_ma,
         "xa_ten": xa.ten if xa else None,
         "don_vi_ten": xa.ten if xa else (tinh.ten if tinh else None),
+        "don_vi": xa.ten if xa else (tinh.ten if tinh else None),
         "so_cong_van": lo.so_cong_van,
         "ma_lo": lo.ma_lo,
         "trang_thai": lo.trang_thai,
