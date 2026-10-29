@@ -96,7 +96,7 @@ export function LoginPage() {
           Hệ thống Quản lý Biển số xe
         </h2>
         <p style={{ color: "var(--color-text-muted)", marginTop: 0 }}>
-          Đăng nhập dành cho Admin, 34 Tỉnh/thành và 3.321 Xã/phường/đặc khu
+          Đăng nhập hệ thống quản lý đặt và cấp phát biển số xe
         </p>
 
         {error && (
@@ -113,16 +113,17 @@ export function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} autoComplete="off">
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>
-              Tên đăng nhập (Mã đơn vị / ADMINS)
+              Tên đăng nhập
             </label>
             <input
               className="input"
               style={{ width: "100%" }}
               value={tenDangNhap}
               onChange={(e) => setTenDangNhap(e.target.value)}
+              autoComplete="off"
               required
               autoFocus
             />
@@ -138,6 +139,7 @@ export function LoginPage() {
               style={{ width: "100%" }}
               value={matKhau}
               onChange={(e) => setMatKhau(e.target.value)}
+              autoComplete="new-password"
               required
             />
           </div>
@@ -236,3 +238,4 @@ export function LoginPage() {
     </div>
   );
 }
+
