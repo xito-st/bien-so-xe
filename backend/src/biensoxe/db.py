@@ -22,10 +22,12 @@ _started_local_pg: bool = False
 
 def ensure_local_postgres() -> None:
     """Tự động khởi động PostgreSQL 17 portable cục bộ nếu cổng 5432 chưa mở."""
-    global _started_local_pg
     try:
         with socket.create_connection(("127.0.0.1", 5432), timeout=0.5):
             return
+    except PermissionError:
+        # Bị chặn kết nối mạng bởi sandbox, không can thiệp vào tiến trình PostgreSQL đang chạy
+        return
     except OSError:
         pass
 
@@ -33,18 +35,15 @@ def ensure_local_postgres() -> None:
     pg_ctl = tools_dir / "pgsql" / "bin" / "pg_ctl.exe"
     pgdata = tools_dir / "pgdata17"
     if pg_ctl.exists() and pgdata.exists():
-        pid_file = pgdata / "postmaster.pid"
-        if pid_file.exists():
-            try:
-                pid_file.unlink()
-            except OSError:
-                pass
-        old_log_in_data = pgdata / "postgres.log"
-        if old_log_in_data.exists():
-            try:
-                old_log_in_data.unlink()
-            except OSError:
-                pass
+        status_proc = subprocess.run(
+            [str(pg_ctl), "-D", str(pgdata), "status"],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if status_proc.returncode == 0:
+            return
         subprocess.run(
             [
                 str(pg_ctl),
@@ -60,21 +59,6 @@ def ensure_local_postgres() -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        if not _started_local_pg:
-            _started_local_pg = True
-
-            def _stop_pg() -> None:
-                if _engine is not None:
-                    _engine.dispose()
-                subprocess.run(
-                    [str(pg_ctl), "-D", str(pgdata), "-m", "fast", "stop"],
-                    check=False,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-
-            atexit.register(_stop_pg)
 
 
 def get_engine(database_url: str | None = None) -> Engine:
