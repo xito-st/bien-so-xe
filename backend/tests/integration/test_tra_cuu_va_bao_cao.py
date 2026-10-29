@@ -166,3 +166,15 @@ def test_five_reports_r1_to_r5_and_xlsx_export_matching_counts_ac45(
         wb = openpyxl.load_workbook(io.BytesIO(resp_xlsx.content))
         ws = wb.active
         assert ws.max_row - 1 == len(resp_json.json()["rows"])
+
+    # Kiểm tra API tương tác drill-down chi tiết biển số từ bảng thống kê
+    drill_xa = xa1.get("/api/v1/bao-cao/chi-tiet/bien", params={"xa_ma": "10105001", "loai_lo": "XA"}).json()
+    assert drill_xa["total"] >= 1
+    assert all(p["xa_ma"] == "10105001" for p in drill_xa["items"])
+    assert "bien_so_day_du" in drill_xa["items"][0]
+    assert "don_vi" in drill_xa["items"][0]
+
+    drill_tinh = tinh01.get("/api/v1/bao-cao/chi-tiet/bien", params={"tinh_ma": "01"}).json()
+    assert drill_tinh["total"] >= 1
+    assert all(p["tinh_ma"] == "01" for p in drill_tinh["items"])
+

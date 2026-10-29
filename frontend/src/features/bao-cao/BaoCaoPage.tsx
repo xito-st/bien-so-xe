@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "../../api/client";
 import { StatusBadge } from "../../components/ConfirmModal";
 import { useAuth } from "../auth/AuthContext";
 
 type ReportType = "R1" | "R2" | "R3" | "R4" | "R5";
+
+interface SelectedDrilldown {
+  tableType: "LO" | "BIEN" | "R2" | "R4";
+  title: string;
+  unitName: string;
+  badgeText: string;
+  badgeClass: string;
+  params: Record<string, any>;
+}
 
 interface ReportTabConfig {
   code: ReportType;
@@ -120,6 +129,8 @@ export function BaoCaoPage() {
   const loadReport = async () => {
     setLoading(true);
     setError("");
+    setSelectedDrilldown(null);
+    setDrilldownPlates([]);
     try {
       const qs = buildQs();
       const res = await apiRequest(
@@ -148,9 +159,146 @@ export function BaoCaoPage() {
     setTuNgay("");
     setDenNgay("");
     setSearchTerm("");
+    setSelectedDrilldown(null);
+    setDrilldownPlates([]);
   };
 
   const exportUrl = `/api/v1/bao-cao/${reportCode}/xuat?${buildQs()}`;
+
+  // Trạng thái tương tác Drill-down hiển thị danh sách biển số chi tiết
+  const [selectedDrilldown, setSelectedDrilldown] = useState<SelectedDrilldown | null>(null);
+  const [drilldownPlates, setDrilldownPlates] = useState<any[]>([]);
+  const [loadingDrilldown, setLoadingDrilldown] = useState(false);
+  const [drilldownSearch, setDrilldownSearch] = useState("");
+  const drilldownRef = useRef<HTMLDivElement>(null);
+
+  const filteredDrilldownPlates = useMemo(() => {
+    if (!drilldownSearch.trim()) return drilldownPlates;
+    const term = drilldownSearch.toLowerCase().trim();
+    return drilldownPlates.filter((p: any) =>
+      Object.values(p).some((v) =>
+        String(v ?? "").toLowerCase().includes(term)
+      )
+    );
+  }, [drilldownPlates, drilldownSearch]);
+
+  const fetchDrilldown = async (drilldown: SelectedDrilldown) => {
+    setSelectedDrilldown(drilldown);
+    setLoadingDrilldown(true);
+    setDrilldownSearch("");
+    try {
+      const qs = new URLSearchParams();
+      Object.entries(drilldown.params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+          qs.set(k, String(v));
+        }
+      });
+      const res = await apiRequest<{ items: any[]; total: number }>(
+        `/api/v1/bao-cao/chi-tiet/bien?${qs.toString()}`
+      );
+      setDrilldownPlates(res.items || []);
+      setTimeout(() => {
+        drilldownRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
+    } catch (err) {
+      console.error("Lỗi tải chi tiết biển số:", err);
+      setDrilldownPlates([]);
+    } finally {
+      setLoadingDrilldown(false);
+    }
+  };
+
+  const isLoRowSelected = (r: any) =>
+    selectedDrilldown?.tableType === "LO" &&
+    selectedDrilldown.params.loai_lo === r.loai &&
+    selectedDrilldown.params.trang_thai_lo === r.trang_thai &&
+    (selectedDrilldown.params.xa_ma || "") === (r.xa_ma || "");
+
+  const handleToggleLoRow = (r: any) => {
+    if (isLoRowSelected(r)) {
+      setSelectedDrilldown(null);
+      setDrilldownPlates([]);
+      return;
+    }
+    fetchDrilldown({
+      tableType: "LO",
+      title: `Chi tiết Biển số theo ${r.loai_hien_thi || r.loai}`,
+      unitName: r.don_vi || "—",
+      badgeText: `Trạng thái lô: ${r.trang_thai}`,
+      badgeClass: "badge-info",
+      params: {
+        loai_lo: r.loai,
+        trang_thai_lo: r.trang_thai,
+        tinh_ma: r.tinh_ma || tinhMa,
+        xa_ma: r.xa_ma || "",
+        is_cap_tinh: !r.xa_ma,
+        tu_ngay: tuNgay ? `${tuNgay}T00:00:00` : undefined,
+        den_ngay: denNgay ? `${denNgay}T23:59:59` : undefined,
+      },
+    });
+  };
+
+  const isBienRowSelected = (r: any) =>
+    selectedDrilldown?.tableType === "BIEN" &&
+    selectedDrilldown.params.tinh_trang === r.tinh_trang &&
+    selectedDrilldown.params.giao === r.giao &&
+    (selectedDrilldown.params.xa_ma || "") === (r.xa_ma || "");
+
+  const handleToggleBienRow = (r: any) => {
+    if (isBienRowSelected(r)) {
+      setSelectedDrilldown(null);
+      setDrilldownPlates([]);
+      return;
+    }
+    fetchDrilldown({
+      tableType: "BIEN",
+      title: `Chi tiết Biển số theo Tình trạng: ${r.tinh_trang}`,
+      unitName: r.don_vi || "—",
+      badgeText: `Trạng thái giao: ${r.giao}`,
+      badgeClass: "badge-success",
+      params: {
+        tinh_trang: r.tinh_trang,
+        giao: r.giao,
+        tinh_ma: r.tinh_ma || tinhMa,
+        xa_ma: r.xa_ma || "",
+        is_cap_tinh: !r.xa_ma,
+        tu_ngay: tuNgay ? `${tuNgay}T00:00:00` : undefined,
+        den_ngay: denNgay ? `${denNgay}T23:59:59` : undefined,
+      },
+    });
+  };
+
+  const isR2RowSelected = (r: any) =>
+    selectedDrilldown?.tableType === "R2" &&
+    selectedDrilldown.params.seri_chu === r.seri_chu &&
+    selectedDrilldown.params.loai_pt === r.loai_pt &&
+    (selectedDrilldown.params.xa_ma || "") === (r.xa_ma || "") &&
+    selectedDrilldown.params.tinh_trang === r.tinh_trang;
+
+  const handleToggleR2Row = (r: any) => {
+    if (isR2RowSelected(r)) {
+      setSelectedDrilldown(null);
+      setDrilldownPlates([]);
+      return;
+    }
+    fetchDrilldown({
+      tableType: "R2",
+      title: `Chi tiết Biển số Tồn kho: ${r.loai_pt} (Seri ${r.seri_chu})`,
+      unitName: r.don_vi || "—",
+      badgeText: `Tình trạng: ${r.tinh_trang}`,
+      badgeClass: "badge-warning",
+      params: {
+        tinh_ma: r.tinh_ma || tinhMa,
+        xa_ma: r.xa_ma || "",
+        is_cap_tinh: !r.xa_ma,
+        loai_pt: r.loai_pt,
+        seri_chu: r.seri_chu,
+        tinh_trang: r.tinh_trang,
+        tu_ngay: tuNgay ? `${tuNgay}T00:00:00` : undefined,
+        den_ngay: denNgay ? `${denNgay}T23:59:59` : undefined,
+      },
+    });
+  };
 
   // Lọc dữ liệu trong bảng theo ô tìm kiếm
   const filteredRows = useMemo(() => {
@@ -873,7 +1021,7 @@ export function BaoCaoPage() {
                           <th style={{ minWidth: 200 }}>ĐƠN VỊ</th>
                           <th style={{ width: 180 }}>LOẠI LÔ</th>
                           <th>TRẠNG THÁI TIẾN ĐỘ VÒNG ĐỜI</th>
-                          <th style={{ width: 140, textAlign: "right" }}>SỐ LƯỢNG LÔ</th>
+                          <th style={{ width: 180, textAlign: "right" }}>SỐ LƯỢNG LÔ</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -891,31 +1039,68 @@ export function BaoCaoPage() {
                             </td>
                           </tr>
                         ) : (
-                          filteredBangLo.map((r: any, idx: number) => (
-                            <tr key={idx}>
-                              <td style={{ textAlign: "center" }}>{idx + 1}</td>
-                              <td>
-                                <strong>{r.don_vi || "—"}</strong>
-                              </td>
-                              <td>
-                                <span className="badge badge-info" style={{ fontWeight: 600 }}>
-                                  {r.loai_hien_thi || r.phan_loai || r.loai || "—"}
-                                </span>
-                              </td>
-                              <td>
-                                <StatusBadge status={r.trang_thai} />
-                              </td>
-                              <td
+                          filteredBangLo.map((r: any, idx: number) => {
+                            const isSelected = isLoRowSelected(r);
+                            return (
+                              <tr
+                                key={idx}
+                                onClick={() => handleToggleLoRow(r)}
                                 style={{
-                                  textAlign: "right",
-                                  fontWeight: 600,
-                                  color: "var(--color-primary)",
+                                  cursor: "pointer",
+                                  background: isSelected ? "#e0f2fe" : undefined,
+                                  borderLeft: isSelected ? "4px solid var(--color-primary)" : "4px solid transparent",
+                                  transition: "all 0.15s ease",
                                 }}
+                                title="Nhấp để xem danh sách chi tiết các biển số thuộc lô này"
                               >
-                                {(r.so_luong ?? 0).toLocaleString("vi-VN")}
-                              </td>
-                            </tr>
-                          ))
+                                <td style={{ textAlign: "center" }}>
+                                  {isSelected ? "👉 " : ""}{idx + 1}
+                                </td>
+                                <td>
+                                  <strong>{r.don_vi || "—"}</strong>
+                                </td>
+                                <td>
+                                  <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                                    {r.loai_hien_thi || r.phan_loai || r.loai || "—"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <StatusBadge status={r.trang_thai} />
+                                </td>
+                                <td
+                                  style={{
+                                    textAlign: "right",
+                                    fontWeight: 600,
+                                    color: "var(--color-primary)",
+                                  }}
+                                >
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                    <span>{(r.so_luong ?? 0).toLocaleString("vi-VN")}</span>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      style={{
+                                        padding: "2px 8px",
+                                        fontSize: 11,
+                                        height: 24,
+                                        borderRadius: 4,
+                                        background: isSelected ? "var(--color-primary)" : "#f1f5f9",
+                                        color: isSelected ? "#fff" : "var(--color-primary)",
+                                        border: "1px solid #cbd5e1",
+                                        cursor: "pointer",
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleLoRow(r);
+                                      }}
+                                    >
+                                      {isSelected ? "Đang xem" : "Xem biển 🔍"}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                       {filteredBangLo.length > 0 && (
@@ -980,7 +1165,7 @@ export function BaoCaoPage() {
                           <th style={{ minWidth: 200 }}>ĐƠN VỊ</th>
                           <th style={{ width: 200 }}>VỊ TRÍ / TÌNH TRẠNG KHO</th>
                           <th>TRẠNG THÁI CẤP PHÁT / BÀN GIAO</th>
-                          <th style={{ width: 140, textAlign: "right" }}>SỐ LƯỢNG BIỂN</th>
+                          <th style={{ width: 180, textAlign: "right" }}>SỐ LƯỢNG BIỂN</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -998,40 +1183,77 @@ export function BaoCaoPage() {
                             </td>
                           </tr>
                         ) : (
-                          filteredBangBien.map((r: any, idx: number) => (
-                            <tr key={idx}>
-                              <td style={{ textAlign: "center" }}>{idx + 1}</td>
-                              <td>
-                                <strong>{r.don_vi || "—"}</strong>
-                              </td>
-                              <td>
-                                <span
-                                  className={`badge ${
-                                    r.tinh_trang?.includes("kho")
-                                      ? "badge-warning"
-                                      : r.tinh_trang === "Đã hủy"
-                                      ? "badge-danger"
-                                      : "badge-success"
-                                  }`}
-                                  style={{ fontWeight: 600 }}
-                                >
-                                  {r.tinh_trang || r.phan_loai || "—"}
-                                </span>
-                              </td>
-                              <td>
-                                <StatusBadge status={r.giao || r.trang_thai} />
-                              </td>
-                              <td
+                          filteredBangBien.map((r: any, idx: number) => {
+                            const isSelected = isBienRowSelected(r);
+                            return (
+                              <tr
+                                key={idx}
+                                onClick={() => handleToggleBienRow(r)}
                                 style={{
-                                  textAlign: "right",
-                                  fontWeight: 600,
-                                  color: "#10b981",
+                                  cursor: "pointer",
+                                  background: isSelected ? "#d1fae5" : undefined,
+                                  borderLeft: isSelected ? "4px solid #10b981" : "4px solid transparent",
+                                  transition: "all 0.15s ease",
                                 }}
+                                title="Nhấp để xem danh sách chi tiết các biển số này"
                               >
-                                {(r.so_luong ?? 0).toLocaleString("vi-VN")}
-                              </td>
-                            </tr>
-                          ))
+                                <td style={{ textAlign: "center" }}>
+                                  {isSelected ? "👉 " : ""}{idx + 1}
+                                </td>
+                                <td>
+                                  <strong>{r.don_vi || "—"}</strong>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge ${
+                                      r.tinh_trang?.includes("kho")
+                                        ? "badge-warning"
+                                        : r.tinh_trang === "Đã hủy"
+                                        ? "badge-danger"
+                                        : "badge-success"
+                                    }`}
+                                    style={{ fontWeight: 600 }}
+                                  >
+                                    {r.tinh_trang || r.phan_loai || "—"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <StatusBadge status={r.giao || r.trang_thai} />
+                                </td>
+                                <td
+                                  style={{
+                                    textAlign: "right",
+                                    fontWeight: 600,
+                                    color: "#10b981",
+                                  }}
+                                >
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                    <span>{(r.so_luong ?? 0).toLocaleString("vi-VN")}</span>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      style={{
+                                        padding: "2px 8px",
+                                        fontSize: 11,
+                                        height: 24,
+                                        borderRadius: 4,
+                                        background: isSelected ? "#10b981" : "#f1f5f9",
+                                        color: isSelected ? "#fff" : "#047857",
+                                        border: "1px solid #cbd5e1",
+                                        cursor: "pointer",
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleBienRow(r);
+                                      }}
+                                    >
+                                      {isSelected ? "Đang xem" : "Xem biển 🔍"}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                       {filteredBangBien.length > 0 && (
@@ -1082,28 +1304,65 @@ export function BaoCaoPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredRows.map((r: any, idx: number) => (
-                        <tr key={idx}>
-                          <td style={{ textAlign: "center" }}>{idx + 1}</td>
-                          <td style={{ textAlign: "center" }}>{r.tinh_ma}</td>
-                          <td style={{ textAlign: "center" }}>{r.xa_ma || "—"}</td>
-                          <td>
-                            <strong>{r.don_vi || "—"}</strong>
-                          </td>
-                          <td>{r.loai_pt || "—"}</td>
-                          <td style={{ textAlign: "center" }}>
-                            <span className="badge" style={{ fontWeight: 700 }}>
-                              {r.seri_chu || "—"}
-                            </span>
-                          </td>
-                          <td>
-                            <StatusBadge status={r.tinh_trang} />
-                          </td>
-                          <td style={{ textAlign: "right", fontWeight: 600 }}>
-                            {(r.so_bien ?? 0).toLocaleString("vi-VN")}
-                          </td>
-                        </tr>
-                      ))
+                      filteredRows.map((r: any, idx: number) => {
+                        const isSelected = isR2RowSelected(r);
+                        return (
+                          <tr
+                            key={idx}
+                            onClick={() => handleToggleR2Row(r)}
+                            style={{
+                              cursor: "pointer",
+                              background: isSelected ? "#fef3c7" : undefined,
+                              borderLeft: isSelected ? "4px solid var(--color-warning)" : "4px solid transparent",
+                              transition: "all 0.15s ease",
+                            }}
+                            title="Nhấp để xem danh sách chi tiết các biển số này"
+                          >
+                            <td style={{ textAlign: "center" }}>
+                              {isSelected ? "👉 " : ""}{idx + 1}
+                            </td>
+                            <td style={{ textAlign: "center" }}>{r.tinh_ma}</td>
+                            <td style={{ textAlign: "center" }}>{r.xa_ma || "—"}</td>
+                            <td>
+                              <strong>{r.don_vi || "—"}</strong>
+                            </td>
+                            <td>{r.loai_pt || "—"}</td>
+                            <td style={{ textAlign: "center" }}>
+                              <span className="badge" style={{ fontWeight: 700 }}>
+                                {r.seri_chu || "—"}
+                              </span>
+                            </td>
+                            <td>
+                              <StatusBadge status={r.tinh_trang} />
+                            </td>
+                            <td style={{ textAlign: "right", fontWeight: 600 }}>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                <span>{(r.so_bien ?? 0).toLocaleString("vi-VN")}</span>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  style={{
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    height: 24,
+                                    borderRadius: 4,
+                                    background: isSelected ? "var(--color-warning)" : "#f1f5f9",
+                                    color: isSelected ? "#fff" : "#b45309",
+                                    border: "1px solid #cbd5e1",
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleR2Row(r);
+                                  }}
+                                >
+                                  {isSelected ? "Đang xem" : "Xem biển 🔍"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                   {filteredRows.length > 0 && (
@@ -1345,6 +1604,174 @@ export function BaoCaoPage() {
                 </table>
               )}
             </div>
+
+            {/* Khối hiển thị chi tiết Biển số tương tác (Drill-down) */}
+            {selectedDrilldown && (
+              <div
+                ref={drilldownRef}
+                style={{
+                  marginTop: 20,
+                  padding: 18,
+                  border: "2px solid var(--color-primary)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "0 8px 24px rgba(27, 54, 93, 0.12)",
+                  background: "#ffffff",
+                }}
+              >
+                {/* Header drilldown */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    paddingBottom: 12,
+                    marginBottom: 12,
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span
+                        className={`badge ${selectedDrilldown.badgeClass}`}
+                        style={{ fontWeight: 700, fontSize: 12 }}
+                      >
+                        {selectedDrilldown.tableType === "LO"
+                          ? "CHI TIẾT THEO LÔ"
+                          : selectedDrilldown.tableType === "BIEN"
+                          ? "CHI TIẾT THEO BIỂN"
+                          : "CHI TIẾT BIỂN SỐ"}
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: 16, color: "var(--color-primary)" }}>
+                        {selectedDrilldown.title}
+                      </h4>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                      Đơn vị: <strong>{selectedDrilldown.unitName}</strong> • {selectedDrilldown.badgeText} •{" "}
+                      <strong style={{ color: "var(--color-primary)" }}>
+                        {drilldownPlates.length}
+                      </strong>{" "}
+                      biển số tương ứng
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input
+                      className="input"
+                      placeholder="Lọc biển số trong danh sách..."
+                      style={{ width: 220 }}
+                      value={drilldownSearch}
+                      onChange={(e) => setDrilldownSearch(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setSelectedDrilldown(null);
+                        setDrilldownPlates([]);
+                      }}
+                      style={{ padding: "6px 14px", fontSize: 13 }}
+                    >
+                      ✖ Đóng chi tiết
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nội dung danh sách biển số */}
+                {loadingDrilldown ? (
+                  <div style={{ textAlign: "center", padding: 32, color: "var(--color-text-muted)" }}>
+                    Đang tải danh sách biển số chi tiết...
+                  </div>
+                ) : filteredDrilldownPlates.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 24, color: "var(--color-text-muted)" }}>
+                    {drilldownSearch
+                      ? "Không tìm thấy biển số nào khớp với từ khóa tìm kiếm."
+                      : "Không có biển số nào thuộc phân nhóm này."}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto", maxHeight: 420 }}>
+                    <table className="data-table" style={{ fontSize: 13 }}>
+                      <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "#f8fafc" }}>
+                        <tr>
+                          <th style={{ width: 50, textAlign: "center" }}>STT</th>
+                          <th style={{ width: 140 }}>MÃ LÔ</th>
+                          <th style={{ width: 140 }}>MÃ LÔ ĐNM</th>
+                          <th style={{ minWidth: 160 }}>ĐƠN VỊ</th>
+                          <th style={{ width: 140 }}>BIỂN SỐ</th>
+                          <th style={{ minWidth: 160 }}>LOẠI PHƯƠNG TIỆN</th>
+                          <th style={{ width: 100, textAlign: "center" }}>MÀU SẮC</th>
+                          <th style={{ width: 130 }}>TÌNH TRẠNG KHO</th>
+                          <th style={{ width: 130 }}>TRẠNG THÁI GIAO</th>
+                          <th style={{ width: 130 }}>NGÀY TẠO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDrilldownPlates.map((p: any, pIdx: number) => (
+                          <tr key={p.id || pIdx}>
+                            <td style={{ textAlign: "center" }}>{pIdx + 1}</td>
+                            <td>
+                              <strong>{p.ma_lo || "—"}</strong>
+                            </td>
+                            <td>{p.ma_lo_dnm ? <strong>{p.ma_lo_dnm}</strong> : "—"}</td>
+                            <td>{p.don_vi || "—"}</td>
+                            <td>
+                              <span
+                                style={{
+                                  fontFamily: "monospace",
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  color: "#0f172a",
+                                  background: "#f1f5f9",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  border: "1px solid #cbd5e1",
+                                }}
+                              >
+                                {p.bien_so_day_du}
+                              </span>
+                            </td>
+                            <td>{p.loai_pt || "—"}</td>
+                            <td style={{ textAlign: "center" }}>
+                              <span
+                                className={`badge ${
+                                  p.mau_sac === "VÀNG"
+                                    ? "badge-warning"
+                                    : p.mau_sac === "XANH"
+                                    ? "badge-info"
+                                    : "badge-secondary"
+                                }`}
+                              >
+                                {p.mau_sac || "TRẮNG"}
+                              </span>
+                            </td>
+                            <td>
+                              <StatusBadge status={p.tinh_trang} />
+                            </td>
+                            <td>
+                              <StatusBadge status={p.giao} />
+                            </td>
+                            <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                              {p.tao_luc || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
+                          <td colSpan={4} style={{ textAlign: "right", paddingRight: 16 }}>
+                            TỔNG SỐ BIỂN HIỂN THỊ:
+                          </td>
+                          <td colSpan={6} style={{ color: "var(--color-primary)" }}>
+                            {filteredDrilldownPlates.length.toLocaleString("vi-VN")} biển số
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

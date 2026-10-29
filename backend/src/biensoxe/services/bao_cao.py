@@ -573,3 +573,125 @@ def export_report_xlsx(
     buf.seek(0)
     return buf.getvalue()
 
+
+def get_report_drilldown_plates(
+    db: Session,
+    scope: ScopeFilter,
+    *,
+    tinh_ma: str | None = None,
+    xa_ma: str | None = None,
+    is_cap_tinh: bool = False,
+    loai_lo: str | None = None,
+    trang_thai_lo: str | None = None,
+    tinh_trang: str | None = None,
+    giao: str | None = None,
+    loai_pt: str | None = None,
+    seri_chu: str | None = None,
+    tu_ngay: datetime | None = None,
+    den_ngay: datetime | None = None,
+    limit: int = 500,
+) -> list[dict]:
+    """Truy vấn danh sách biển số chi tiết phục vụ tương tác trực tiếp (drill-down) trên bảng thống kê."""
+    tinh_map = {t.ma: t.ten for t in db.scalars(select(Tinh)).all()}
+    xa_map = {x.ma: x.ten for x in db.scalars(select(XaPhuong)).all()}
+
+    stmt = (
+        select(Bien, Lo, LoaiPT, NenBien)
+        .join(Lo, Lo.id == Bien.lo_id)
+        .join(LoaiPT, LoaiPT.id == Bien.loai_pt_id)
+        .join(NenBien, NenBien.id == Bien.nen_bien_id)
+    )
+    stmt = _apply_bien_scope_and_filters(
+        stmt,
+        scope,
+        tu_ngay=tu_ngay,
+        den_ngay=den_ngay,
+    )
+
+    if xa_ma and xa_ma.strip():
+        stmt = stmt.where(Bien.xa_ma == xa_ma.strip())
+    elif is_cap_tinh and tinh_ma and tinh_ma.strip():
+        # Cấp tỉnh (không thuộc xã nào)
+        stmt = stmt.where(Bien.tinh_ma == tinh_ma.strip().zfill(2), Bien.xa_ma.is_(None))
+    elif tinh_ma and tinh_ma.strip():
+        stmt = stmt.where(Bien.tinh_ma == tinh_ma.strip().zfill(2))
+
+    if loai_lo and loai_lo.strip():
+        ll = loai_lo.strip().upper()
+        if ll == "DAT_NHA_MAY":
+            dnm_sub = select(Lo.id).where(Lo.loai == "DAT_NHA_MAY")
+            if trang_thai_lo and trang_thai_lo.strip():
+                dnm_sub = dnm_sub.where(Lo.trang_thai == trang_thai_lo.strip())
+            stmt = stmt.where(or_(Lo.loai == "DAT_NHA_MAY", Lo.lo_cha_id.in_(dnm_sub)))
+        elif ll in ("XA", "TINH"):
+            stmt = stmt.where(Lo.loai == ll)
+            if trang_thai_lo and trang_thai_lo.strip():
+                stmt = stmt.where(Lo.trang_thai == trang_thai_lo.strip())
+    elif trang_thai_lo and trang_thai_lo.strip():
+        stmt = stmt.where(Lo.trang_thai == trang_thai_lo.strip())
+
+    if tinh_trang and tinh_trang.strip():
+        stmt = stmt.where(Bien.tinh_trang == tinh_trang.strip())
+
+    if giao and giao.strip():
+        g = giao.strip()
+        if g in ("Chưa giao", "Chưa trả", "Chưa bàn giao", "Chưa giao / Lưu kho"):
+            stmt = stmt.where(or_(Bien.giao == "Chưa trả", Bien.giao == g, Bien.giao.is_(None)))
+        else:
+            stmt = stmt.where(Bien.giao == g)
+
+    if loai_pt and loai_pt.strip():
+        stmt = stmt.where(LoaiPT.ten.ilike(f"%{loai_pt.strip()}%"))
+
+    if seri_chu and seri_chu.strip():
+        stmt = stmt.where(Bien.seri_chu == seri_chu.strip().upper())
+
+    stmt = stmt.order_by(Bien.stt.asc(), Bien.id.asc()).limit(limit)
+    rows = db.execute(stmt).all()
+
+    # Thu thập parent_ids để tìm mã lô ĐNM
+    parent_ids = {lo.lo_cha_id for bien, lo, lp, nb in rows if lo.lo_cha_id}
+    parent_map = {}
+    if parent_ids:
+        parent_los = db.scalars(select(Lo).where(Lo.id.in_(parent_ids))).all()
+        parent_map = {p.id: p.ma_lo for p in parent_los}
+
+    results = []
+    for bien, lo, lp, nb in rows:
+        don_vi = (
+            xa_map.get(bien.xa_ma)
+            if bien.xa_ma
+            else f"{tinh_map.get(bien.tinh_ma, bien.tinh_ma)} (Cấp tỉnh)"
+        )
+        ma_lo_dnm = (
+            parent_map.get(lo.lo_cha_id)
+            if lo.lo_cha_id
+            else (lo.ma_lo if lo.loai == "DAT_NHA_MAY" else None)
+        )
+        results.append(
+            {
+                "id": bien.id,
+                "ma_lo": lo.ma_lo,
+                "ma_lo_dnm": ma_lo_dnm,
+                "loai_lo": lo.loai,
+                "loai_lo_hien_thi": _friendly_lo_type(lo.loai),
+                "trang_thai_lo": lo.trang_thai,
+                "tinh_ma": bien.tinh_ma,
+                "xa_ma": bien.xa_ma,
+                "don_vi": don_vi,
+                "bien_so_day_du": bien.bien_so_day_du,
+                "seri_chu": bien.seri_chu,
+                "dau_so": bien.dau_so,
+                "loai_pt": lp.ten,
+                "mau_sac": nb.mau_sac,
+                "tinh_trang": bien.tinh_trang,
+                "giao": bien.giao or "Chưa trả",
+                "tao_luc": (
+                    lo.tao_luc.strftime("%d/%m/%Y %H:%M")
+                    if hasattr(lo, "tao_luc") and lo.tao_luc
+                    else "—"
+                ),
+            }
+        )
+    return results
+
