@@ -383,3 +383,4 @@ def test_chuyen_xa_tra_bien_thu_hoi_and_huy_bien_ac34_ac35_ac42_ac44(
         ).status_code
         == 201
     )
+

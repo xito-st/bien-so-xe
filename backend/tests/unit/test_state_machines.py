@@ -118,3 +118,4 @@ def test_bien_two_axes_state_machine_4i():
             else:
                 with pytest.raises(StateTransitionError):
                     validate_bien_giao_transition(g_from, g_to)
+

@@ -38,3 +38,4 @@ $Cutoff = (Get-Date).AddDays(-$RetentionDays)
 Get-ChildItem -Path $BackupDir -Filter "*.dump" | Where-Object { $_.LastWriteTime -lt $Cutoff } | Remove-Item -Force
 
 Write-Output $DumpFile
+

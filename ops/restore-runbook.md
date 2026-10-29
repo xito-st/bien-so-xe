@@ -38,3 +38,4 @@ Trên máy chủ ứng dụng, chạy lệnh CLI vận hành:
 .\backend\.venv\Scripts\python.exe -m biensoxe.cli reset-admin
 ```
 Lệnh sẽ đặt lại mật khẩu khởi tạo của `ADMINS`, tắt cờ `totp_da_bat`, thu hồi toàn bộ phiên đang mở và ghi sự kiện `DAT_LAI_MAT_KHAU_ADMIN` vào `audit_log`.
+

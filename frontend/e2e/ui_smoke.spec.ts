@@ -10,3 +10,4 @@ export const E2E_SCENARIOS = [
   "AC-46, FR-091: Hộp thoại xác nhận trước khi Gửi lô, Chấp nhận hàng loạt, Hủy, Chuyển xã",
   "AC-50, NFR-012: Hiển thị và xuất Excel tiếng Việt có dấu (MĐ1, Đặc khu) và múi giờ UTC+7",
 ];
+

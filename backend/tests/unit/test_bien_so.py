@@ -184,3 +184,4 @@ def test_property_parse_idempotent(ma_tinh, seri_chu, phan_nguyen, phan_thap_pha
         active_nen_bien=SAMPLE_NEN_BIEN,
     )
     assert first == second
+

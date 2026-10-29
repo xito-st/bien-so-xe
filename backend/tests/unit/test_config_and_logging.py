@@ -63,3 +63,4 @@ def test_health_and_security_headers():
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
     assert resp.headers["X-Frame-Options"] == "DENY"
     assert "default-src 'self'" in resp.headers["Content-Security-Policy"]
+

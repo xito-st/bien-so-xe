@@ -254,3 +254,4 @@ def downgrade() -> None:
     op.drop_table("ban_giao")
     op.drop_table("lo_lich_su")
     op.drop_table("lo")
+

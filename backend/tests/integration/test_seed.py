@@ -81,3 +81,4 @@ def test_seed_danh_muc_and_tai_khoan(db_session):
     assert all(h.startswith("$argon2id$") for h in hashes)
     assert all("Abc@321" not in h and "Abc@!321" not in h for h in hashes)
     assert len(set(hashes)) == len(hashes)
+
