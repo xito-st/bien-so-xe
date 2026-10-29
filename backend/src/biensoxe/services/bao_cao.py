@@ -100,8 +100,40 @@ def get_report_data(
     xa_map = {x.ma: x.ten for x in db.scalars(select(XaPhuong)).all()}
 
     if code == "R1":
-        lo_stmt = select(Lo.loai, Lo.trang_thai, func.count(Lo.id)).group_by(
-            Lo.loai, Lo.trang_thai
+        # Tiến độ chuẩn của lô theo quy trình vòng đời:
+        # Khởi tạo -> Đã gửi -> Chờ phê duyệt -> Chấp nhận -> Đặt thành công -> Đã nhập kho -> Đã chuyển Xã/phường -> Đã nhận -> Từ chối / Hủy
+        LO_PROGRESS_ORDER = {
+            "Khởi tạo": 1,
+            "Đã gửi": 2,
+            "Chờ phê duyệt": 3,
+            "Chấp nhận": 4,
+            "Đặt thành công": 5,
+            "Đã nhập kho": 6,
+            "Đã chuyển Xã/phường": 7,
+            "Đã nhận": 8,
+            "Từ chối": 9,
+            "Hủy": 10,
+        }
+
+        # Tiến độ chuẩn của biển số theo trạng thái kho & cấp phát:
+        BIEN_PROGRESS_ORDER = {
+            "Tồn kho tỉnh": 1,
+            "Tồn kho xã": 2,
+            "Chưa trả": 3,
+            "Đã trả": 4,
+            "Thu hồi về xã": 5,
+            "Đã hủy": 6,
+        }
+
+        lo_stmt = (
+            select(
+                Lo.tinh_ma,
+                Lo.xa_ma,
+                Lo.loai,
+                Lo.trang_thai,
+                func.count(Lo.id),
+            )
+            .group_by(Lo.tinh_ma, Lo.xa_ma, Lo.loai, Lo.trang_thai)
         )
         lo_stmt = _apply_lo_scope_and_filters(
             lo_stmt,
@@ -110,13 +142,19 @@ def get_report_data(
             xa_ma=xa_ma,
             tu_ngay=tu_ngay,
             den_ngay=den_ngay,
-        ).order_by(Lo.loai.asc(), Lo.trang_thai.asc())
-        lo_rows = db.execute(lo_stmt).all()
+        )
+        lo_raw_rows = db.execute(lo_stmt).all()
 
         bien_stmt = (
-            select(Bien.tinh_trang, Bien.giao, func.count(Bien.id))
+            select(
+                Bien.tinh_ma,
+                Bien.xa_ma,
+                Bien.tinh_trang,
+                Bien.giao,
+                func.count(Bien.id),
+            )
             .join(Lo, Lo.id == Bien.lo_id)
-            .group_by(Bien.tinh_trang, Bien.giao)
+            .group_by(Bien.tinh_ma, Bien.xa_ma, Bien.tinh_trang, Bien.giao)
         )
         bien_stmt = _apply_bien_scope_and_filters(
             bien_stmt,
@@ -125,43 +163,94 @@ def get_report_data(
             xa_ma=xa_ma,
             tu_ngay=tu_ngay,
             den_ngay=den_ngay,
-        ).order_by(Bien.tinh_trang.asc(), Bien.giao.asc())
-        bien_rows = db.execute(bien_stmt).all()
+        )
+        bien_raw_rows = db.execute(bien_stmt).all()
 
+        bang_lo = []
+        for tm, xm, loai, tt, cnt in lo_raw_rows:
+            don_vi = (
+                xa_map.get(xm, f"Xã/Phường {xm}")
+                if xm
+                else (f"{tinh_map.get(tm, tm)} (Cấp tỉnh)" if tm else "Cơ quan Quản lý")
+            )
+            bang_lo.append(
+                {
+                    "tinh_ma": tm,
+                    "xa_ma": xm,
+                    "don_vi": don_vi,
+                    "loai": loai,
+                    "loai_hien_thi": _friendly_lo_type(loai),
+                    "trang_thai": tt,
+                    "so_luong": int(cnt),
+                    "thu_tu_tien_do": LO_PROGRESS_ORDER.get(tt, 99),
+                }
+            )
+        # Sắp xếp theo đơn vị rồi theo thứ tự tiến độ chuẩn của lô
+        bang_lo.sort(key=lambda x: (x["don_vi"], x["thu_tu_tien_do"], x["loai"]))
+
+        bang_bien = []
+        for tm, xm, tt, giao, cnt in bien_raw_rows:
+            don_vi = (
+                xa_map.get(xm, f"Xã/Phường {xm}")
+                if xm
+                else (f"{tinh_map.get(tm, tm)} (Cấp tỉnh)" if tm else "Cơ quan Quản lý")
+            )
+            giao_str = giao if giao else "Chưa bàn giao"
+            bien_order = BIEN_PROGRESS_ORDER.get(giao, BIEN_PROGRESS_ORDER.get(tt, 99))
+            bang_bien.append(
+                {
+                    "tinh_ma": tm,
+                    "xa_ma": xm,
+                    "don_vi": don_vi,
+                    "tinh_trang": tt,
+                    "giao": giao_str,
+                    "so_luong": int(cnt),
+                    "thu_tu_tien_do": bien_order,
+                }
+            )
+        # Sắp xếp theo đơn vị rồi theo thứ tự tiến độ chuẩn của biển số
+        bang_bien.sort(key=lambda x: (x["don_vi"], x["thu_tu_tien_do"], x["tinh_trang"]))
+
+        # Giữ lo_theo_trang_thai & bien_theo_tinh_trang để tương thích thẻ KPI
         lo_theo_trang_thai = [
-            {"loai": loai, "trang_thai": tt, "so_lo": int(cnt)}
-            for loai, tt, cnt in lo_rows
+            {"loai": item["loai"], "trang_thai": item["trang_thai"], "so_lo": item["so_luong"]}
+            for item in bang_lo
         ]
         bien_theo_tinh_trang = [
-            {"tinh_trang": tt, "giao": giao, "so_bien": int(cnt)}
-            for tt, giao, cnt in bien_rows
+            {"tinh_trang": item["tinh_trang"], "giao": item["giao"], "so_bien": item["so_luong"]}
+            for item in bang_bien
         ]
+
         rows = [
             {
+                "don_vi": item["don_vi"],
                 "nhom": "LÔ",
-                "phan_loai": _friendly_lo_type(item["loai"]),
+                "phan_loai": item["loai_hien_thi"],
                 "phan_loai_ma": item["loai"],
                 "trang_thai": item["trang_thai"],
-                "so_luong": item["so_lo"],
+                "so_luong": item["so_luong"],
             }
-            for item in lo_theo_trang_thai
+            for item in bang_lo
         ] + [
             {
+                "don_vi": item["don_vi"],
                 "nhom": "BIỂN SỐ",
                 "phan_loai": item["tinh_trang"],
                 "phan_loai_ma": item["tinh_trang"],
-                "trang_thai": item["giao"] or "—",
-                "so_luong": item["so_bien"],
+                "trang_thai": item["giao"],
+                "so_luong": item["so_luong"],
             }
-            for item in bien_theo_tinh_trang
+            for item in bang_bien
         ]
         return {
             "report": "R1",
-            "title": "Báo cáo R1: Số lô và số biển theo trạng thái",
-            "tong_so_lo": sum(x["so_lo"] for x in lo_theo_trang_thai),
-            "tong_so_bien": sum(x["so_bien"] for x in bien_theo_tinh_trang),
+            "title": "Báo cáo R1: Tiến độ Lô và Tình trạng Biển số theo Đơn vị",
+            "tong_so_lo": sum(x["so_luong"] for x in bang_lo),
+            "tong_so_bien": sum(x["so_luong"] for x in bang_bien),
             "lo_theo_trang_thai": lo_theo_trang_thai,
             "bien_theo_tinh_trang": bien_theo_tinh_trang,
+            "bang_lo": bang_lo,
+            "bang_bien": bang_bien,
             "rows": rows,
         }
 
@@ -434,10 +523,10 @@ def export_report_xlsx(
     cell_num = wb.add_format({"border": 1, "num_format": "#,##0", "align": "right", "valign": "vcenter"})
 
     if code == "R1":
-        headers = ["STT", "NHÓM", "PHÂN LOẠI", "TRẠNG THÁI", "SỐ LƯỢNG"]
-        keys = ["nhom", "phan_loai", "trang_thai", "so_luong"]
-        col_widths = [8, 16, 26, 26, 16]
-        alignments = ["center", "center", "left", "left", "right"]
+        headers = ["STT", "ĐƠN VỊ", "NHÓM", "PHÂN LOẠI", "TRẠNG THÁI TIẾN ĐỘ", "SỐ LƯỢNG"]
+        keys = ["don_vi", "nhom", "phan_loai", "trang_thai", "so_luong"]
+        col_widths = [8, 30, 14, 24, 26, 16]
+        alignments = ["center", "left", "center", "left", "left", "right"]
     elif code == "R2":
         headers = ["STT", "MÃ TỈNH", "MÃ XÃ", "ĐƠN VỊ", "LOẠI PHƯƠNG TIỆN", "SERI CHỮ", "TÌNH TRẠNG", "SỐ BIỂN"]
         keys = ["tinh_ma", "xa_ma", "don_vi", "loai_pt", "seri_chu", "tinh_trang", "so_bien"]

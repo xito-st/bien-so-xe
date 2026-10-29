@@ -164,6 +164,35 @@ export function BaoCaoPage() {
     );
   }, [data, searchTerm]);
 
+  // Dữ liệu riêng biệt cho Báo cáo R1: Bảng 1 (Tiến độ Lô) & Bảng 2 (Tiến độ Biển)
+  const filteredBangLo = useMemo(() => {
+    const list =
+      data?.bang_lo && Array.isArray(data.bang_lo)
+        ? data.bang_lo
+        : (data?.rows || []).filter((r: any) => r.nhom === "LÔ");
+    if (!searchTerm.trim()) return list;
+    const term = searchTerm.toLowerCase().trim();
+    return list.filter((r: any) =>
+      Object.values(r).some((v) =>
+        String(v ?? "").toLowerCase().includes(term)
+      )
+    );
+  }, [data, searchTerm]);
+
+  const filteredBangBien = useMemo(() => {
+    const list =
+      data?.bang_bien && Array.isArray(data.bang_bien)
+        ? data.bang_bien
+        : (data?.rows || []).filter((r: any) => r.nhom === "BIỂN SỐ");
+    if (!searchTerm.trim()) return list;
+    const term = searchTerm.toLowerCase().trim();
+    return list.filter((r: any) =>
+      Object.values(r).some((v) =>
+        String(v ?? "").toLowerCase().includes(term)
+      )
+    );
+  }, [data, searchTerm]);
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -775,8 +804,18 @@ export function BaoCaoPage() {
               <div>
                 <h3 style={{ margin: "0 0 4px" }}>{data.title}</h3>
                 <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Hiển thị <strong>{filteredRows.length}</strong> dòng dữ liệu
-                  {searchTerm && ` (được lọc từ tổng số ${data.rows?.length ?? 0} dòng)`}
+                  {reportCode === "R1" ? (
+                    <>
+                      Phân tách 2 bảng riêng biệt theo Đơn vị: Bảng Lô (
+                      <strong>{filteredBangLo.length}</strong> dòng) và Bảng Biển (
+                      <strong>{filteredBangBien.length}</strong> dòng)
+                    </>
+                  ) : (
+                    <>
+                      Hiển thị <strong>{filteredRows.length}</strong> dòng dữ liệu
+                      {searchTerm && ` (được lọc từ tổng số ${data.rows?.length ?? 0} dòng)`}
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -792,67 +831,232 @@ export function BaoCaoPage() {
             </div>
 
             <div style={{ overflowX: "auto" }}>
-              {/* Bảng R1 */}
+              {/* Bảng R1: Tách riêng 2 bảng Lô và Biển theo Đơn vị & Tiến độ chuẩn */}
               {reportCode === "R1" && (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 60, textAlign: "center" }}>STT</th>
-                      <th style={{ width: 140 }}>NHÓM</th>
-                      <th>PHÂN LOẠI ĐỐI TƯỢNG</th>
-                      <th>TRẠNG THÁI</th>
-                      <th style={{ width: 140, textAlign: "right" }}>SỐ LƯỢNG</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "var(--color-text-muted)" }}>
-                          Không có dữ liệu phù hợp.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredRows.map((r: any, idx: number) => (
-                        <tr key={idx}>
-                          <td style={{ textAlign: "center" }}>{idx + 1}</td>
-                          <td>
-                            <span
-                              className={`badge ${
-                                r.nhom === "LÔ" ? "badge-info" : "badge-success"
-                              }`}
-                              style={{ fontWeight: 600 }}
-                            >
-                              {r.nhom}
-                            </span>
-                          </td>
-                          <td>
-                            <strong>{r.phan_loai || r.phan_loai_ma || "—"}</strong>
-                          </td>
-                          <td>
-                            <StatusBadge status={r.trang_thai} />
-                          </td>
-                          <td style={{ textAlign: "right", fontWeight: 600 }}>
-                            {(r.so_luong ?? 0).toLocaleString("vi-VN")}
-                          </td>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {/* BẢNG 1: THEO LÔ */}
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 10,
+                        paddingBottom: 6,
+                        borderBottom: "2px solid #0284c7",
+                      }}
+                    >
+                      <span
+                        style={{
+                          background: "#0284c7",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        BẢNG 1
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>
+                        Thống kê Tiến độ Lô theo từng Đơn vị
+                      </h4>
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        ({filteredBangLo.length} dòng dữ liệu)
+                      </span>
+                    </div>
+
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 60, textAlign: "center" }}>STT</th>
+                          <th style={{ minWidth: 200 }}>ĐƠN VỊ</th>
+                          <th style={{ width: 180 }}>LOẠI LÔ</th>
+                          <th>TRẠNG THÁI TIẾN ĐỘ VÒNG ĐỜI</th>
+                          <th style={{ width: 140, textAlign: "right" }}>SỐ LƯỢNG LÔ</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                  {filteredRows.length > 0 && (
-                    <tfoot>
-                      <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
-                        <td colSpan={4} style={{ textAlign: "right", paddingRight: 16 }}>
-                          TỔNG CỘNG:
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          {filteredRows
-                            .reduce((acc: number, cur: any) => acc + (cur.so_luong || 0), 0)
-                            .toLocaleString("vi-VN")}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
+                      </thead>
+                      <tbody>
+                        {filteredBangLo.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              style={{
+                                textAlign: "center",
+                                padding: 20,
+                                color: "var(--color-text-muted)",
+                              }}
+                            >
+                              Không có dữ liệu lô phù hợp.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredBangLo.map((r: any, idx: number) => (
+                            <tr key={idx}>
+                              <td style={{ textAlign: "center" }}>{idx + 1}</td>
+                              <td>
+                                <strong>{r.don_vi || "—"}</strong>
+                              </td>
+                              <td>
+                                <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                                  {r.loai_hien_thi || r.phan_loai || r.loai || "—"}
+                                </span>
+                              </td>
+                              <td>
+                                <StatusBadge status={r.trang_thai} />
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "right",
+                                  fontWeight: 600,
+                                  color: "var(--color-primary)",
+                                }}
+                              >
+                                {(r.so_luong ?? 0).toLocaleString("vi-VN")}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {filteredBangLo.length > 0 && (
+                        <tfoot>
+                          <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
+                            <td colSpan={4} style={{ textAlign: "right", paddingRight: 16 }}>
+                              TỔNG SỐ LÔ THEO TIẾN ĐỘ:
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                color: "var(--color-primary)",
+                                fontSize: 14,
+                              }}
+                            >
+                              {filteredBangLo
+                                .reduce((acc: number, cur: any) => acc + (cur.so_luong || 0), 0)
+                                .toLocaleString("vi-VN")}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+
+                  {/* BẢNG 2: THEO BIỂN */}
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 10,
+                        paddingBottom: 6,
+                        borderBottom: "2px solid #10b981",
+                      }}
+                    >
+                      <span
+                        style={{
+                          background: "#10b981",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        BẢNG 2
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>
+                        Thống kê Tình trạng & Tiến độ Cấp phát Biển số theo từng Đơn vị
+                      </h4>
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        ({filteredBangBien.length} dòng dữ liệu)
+                      </span>
+                    </div>
+
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 60, textAlign: "center" }}>STT</th>
+                          <th style={{ minWidth: 200 }}>ĐƠN VỊ</th>
+                          <th style={{ width: 200 }}>VỊ TRÍ / TÌNH TRẠNG KHO</th>
+                          <th>TRẠNG THÁI CẤP PHÁT / BÀN GIAO</th>
+                          <th style={{ width: 140, textAlign: "right" }}>SỐ LƯỢNG BIỂN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredBangBien.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              style={{
+                                textAlign: "center",
+                                padding: 20,
+                                color: "var(--color-text-muted)",
+                              }}
+                            >
+                              Không có dữ liệu biển số phù hợp.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredBangBien.map((r: any, idx: number) => (
+                            <tr key={idx}>
+                              <td style={{ textAlign: "center" }}>{idx + 1}</td>
+                              <td>
+                                <strong>{r.don_vi || "—"}</strong>
+                              </td>
+                              <td>
+                                <span
+                                  className={`badge ${
+                                    r.tinh_trang?.includes("kho")
+                                      ? "badge-warning"
+                                      : r.tinh_trang === "Đã hủy"
+                                      ? "badge-danger"
+                                      : "badge-success"
+                                  }`}
+                                  style={{ fontWeight: 600 }}
+                                >
+                                  {r.tinh_trang || r.phan_loai || "—"}
+                                </span>
+                              </td>
+                              <td>
+                                <StatusBadge status={r.giao || r.trang_thai} />
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "right",
+                                  fontWeight: 600,
+                                  color: "#10b981",
+                                }}
+                              >
+                                {(r.so_luong ?? 0).toLocaleString("vi-VN")}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {filteredBangBien.length > 0 && (
+                        <tfoot>
+                          <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
+                            <td colSpan={4} style={{ textAlign: "right", paddingRight: 16 }}>
+                              TỔNG SỐ BIỂN THEO TIẾN ĐỘ:
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                color: "#10b981",
+                                fontSize: 14,
+                              }}
+                            >
+                              {filteredBangBien
+                                .reduce((acc: number, cur: any) => acc + (cur.so_luong || 0), 0)
+                                .toLocaleString("vi-VN")}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
               )}
 
               {/* Bảng R2 */}
