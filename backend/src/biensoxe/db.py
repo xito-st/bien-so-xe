@@ -94,6 +94,7 @@ def get_session_factory(engine: Engine | None = None) -> sessionmaker[Session]:
 
 def get_db() -> Generator[Session, Any, None]:
     """Dependency cung cấp DB session cho FastAPI endpoint."""
+    ensure_local_postgres()
     session_factory = get_session_factory()
     db = session_factory()
     try:
