@@ -165,24 +165,17 @@ def test_lo_tinh_shared_namespace_lo_dnm_adjustment_and_cancel_ac37_ac38_ac39_ac
     assert r_reapprove.status_code == 200
     assert r_reapprove.json()["trang_thai"] == "Chấp nhận"
 
-    # 5. AC-39, AC-43, G-15: Hủy lô đặt nhà máy DNM-01 -> trả các lô thành phần về Chấp nhận (lo_cha_id = None)
+    # 5. AC-39, AC-43: Hủy lô đặt nhà máy DNM-01 -> xóa hẳn lô ĐNM và trả các lô thành phần về Chấp nhận (lo_cha_id = None)
     r_cancel_dnm = tinh01.post(
         f"/api/v1/lo/{dnm['id']}/huy",
         json={"ly_do": "Hủy để gom lại đợt mới", "xac_nhan": True},
     )
     assert r_cancel_dnm.status_code == 200
-    assert r_cancel_dnm.json()["trang_thai"] == "Hủy"
+    assert r_cancel_dnm.json()["da_xoa"] is True
+    # Lô ĐNM đã bị xóa hoàn toàn khỏi DB
+    assert tinh01.get(f"/api/v1/lo/{dnm['id']}").status_code == 404
     assert tinh01.get(f"/api/v1/lo/{lo_tinh['id']}").json()["lo_cha_id"] is None
     assert tinh01.get(f"/api/v1/lo/{lo_tinh['id']}").json()["trang_thai"] == "Chấp nhận"
-
-    # G-15: Không được dùng lại Số công văn DNM-01 đã Hủy cho lô tỉnh hoặc lô đặt nhà máy mới
-    assert (
-        tinh01.post(
-            "/api/v1/lo",
-            json={"loai": "DAT_NHA_MAY", "so_cong_van": "DNM-01", "lo_con_ids": [lo_tinh["id"]]},
-        ).status_code
-        == 409
-    )
 
     # Tạo lô đặt nhà máy mới DNM-02 chọn lại lo_xa và lo_tinh -> thành công (AC-43)
     r_dnm2 = tinh01.post(

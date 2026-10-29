@@ -442,10 +442,10 @@ def delete_lo(
     if lo.loai in ("TINH", "DAT_NHA_MAY") and not (scope.is_tinh and scope.tinh_ma == lo.tinh_ma):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa lô tỉnh này.")
 
-    if lo.trang_thai != "Khởi tạo":
+    if lo.trang_thai not in ("Khởi tạo", "Hủy"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Chỉ được xóa lô khi ở trạng thái 'Khởi tạo' (hiện tại: '{lo.trang_thai}').",
+            detail=f"Chỉ được xóa lô khi ở trạng thái 'Khởi tạo' hoặc 'Hủy' (hiện tại: '{lo.trang_thai}').",
         )
     if lo.loai == "DAT_NHA_MAY":
         for child in db.scalars(select(Lo).where(Lo.lo_cha_id == lo.id)).all():
@@ -1060,31 +1060,30 @@ def cancel_dnm_lo(
     for c in children:
         c.lo_cha_id = None
 
-    now = datetime.now(timezone.utc)
-    old_st = lo.trang_thai
-    lo.trang_thai = "Hủy"
-    lo.ly_do = reason
-    db.add(
-        LoLichSu(
-            lo_id=lo.id,
-            tu=old_st,
-            den="Hủy",
-            nguoi=scope.ten_dang_nhap,
-            luc=now,
-            ly_do=reason,
-        )
-    )
+    ma_lo = lo.ma_lo
     write_audit_log(
         db,
         nguoi_dung=scope.ten_dang_nhap,
-        hanh_dong="HUY_LO_DNM",
-        doi_tuong=lo.ma_lo,
+        hanh_dong="HUY_VA_XOA_LO_DNM",
+        doi_tuong=ma_lo,
         ket_qua="THANH_CONG",
         ip=ip,
-        chi_tiet={"lo_id": lo.id, "ly_do": reason, "lo_con_tra_ve": released_codes},
+        chi_tiet={
+            "lo_id": lo_id,
+            "ma_lo": ma_lo,
+            "ly_do": reason,
+            "lo_con_tra_ve": released_codes,
+        },
     )
+    db.delete(lo)
     db.commit()
-    return serialize_lo(db, lo)
+    return {
+        "id": lo_id,
+        "ma_lo": ma_lo,
+        "trang_thai": "Hủy",
+        "da_xoa": True,
+        "message": f"Đã hủy và xóa hoàn toàn lô đặt nhà máy {ma_lo}.",
+    }
 
 
 def list_lo_history(db: Session, scope: ScopeFilter, *, lo_id: int) -> list[dict]:

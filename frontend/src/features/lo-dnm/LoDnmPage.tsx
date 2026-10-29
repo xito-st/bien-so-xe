@@ -75,12 +75,20 @@ export function LoDnmPage() {
           body: JSON.stringify(body),
         }
       );
-      setSelectedDnm(updated);
-      setMsg(`Đã thực hiện '${endpoint}' cho lô đặt nhà máy ${updated.ma_lo}.`);
+      if (endpoint === "huy") {
+        setMsg(`Đã hủy và xóa hoàn toàn lô đặt nhà máy ${selectedDnm.ma_lo}.`);
+        setSelectedDnm(null);
+        setPlates([]);
+      } else {
+        setSelectedDnm(updated);
+        setMsg(`Đã thực hiện '${endpoint}' cho lô đặt nhà máy ${updated.ma_lo}.`);
+      }
       setConfirmCancelOpen(false);
       setConfirmDatThanhCongOpen(false);
       await loadData();
-      await loadPlates(selectedDnm.id);
+      if (endpoint !== "huy") {
+        await loadPlates(selectedDnm.id);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Thao tác thất bại.");
     }
@@ -242,7 +250,7 @@ export function LoDnmPage() {
                       className="btn btn-danger"
                       onClick={() => setConfirmCancelOpen(true)}
                     >
-                      Hủy lô đặt nhà máy (FR-069)
+                      Hủy & Xóa lô đặt nhà máy
                     </button>
                   )}
                 </div>
@@ -299,7 +307,7 @@ export function LoDnmPage() {
 
       <ConfirmModal
         open={confirmCancelOpen}
-        title="Xác nhận Hủy Lô đặt nhà máy (FR-069)"
+        title="Xác nhận Hủy & Xóa hẳn Lô đặt nhà máy"
         danger={true}
         onConfirm={() =>
           void handleAction("huy", {
@@ -310,7 +318,7 @@ export function LoDnmPage() {
         onCancel={() => setConfirmCancelOpen(false)}
       >
         <p>
-          Các lô xã và lô tỉnh thành phần sẽ được gỡ ra và giữ nguyên trạng thái Chấp nhận. Mã lô đặt nhà máy đã hủy không được tái sử dụng (G-15).
+          Lô đặt nhà máy sẽ được <strong>xóa hẳn khỏi hệ thống</strong> khi xác nhận hủy. Toàn bộ các lô thành phần (lô xã/lô tỉnh) sẽ được gỡ ra và giữ nguyên trạng thái Chấp nhận để gom lại đợt khác.
         </p>
         <label style={{ display: "block", fontWeight: 600, marginBottom: 4 }}>
           Lý do hủy (bắt buộc):
