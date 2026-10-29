@@ -68,6 +68,16 @@ def _apply_bien_scope_and_filters(
     return stmt
 
 
+def _friendly_lo_type(loai: str) -> str:
+    if loai == "DAT_NHA_MAY":
+        return "Lô Đặt nhà máy"
+    if loai == "TINH":
+        return "Lô Tỉnh"
+    if loai == "XA":
+        return "Lô Xã/Phường"
+    return loai
+
+
 def get_report_data(
     db: Session,
     scope: ScopeFilter,
@@ -129,7 +139,8 @@ def get_report_data(
         rows = [
             {
                 "nhom": "LÔ",
-                "phan_loai": item["loai"],
+                "phan_loai": _friendly_lo_type(item["loai"]),
+                "phan_loai_ma": item["loai"],
                 "trang_thai": item["trang_thai"],
                 "so_luong": item["so_lo"],
             }
@@ -138,6 +149,7 @@ def get_report_data(
             {
                 "nhom": "BIỂN SỐ",
                 "phan_loai": item["tinh_trang"],
+                "phan_loai_ma": item["tinh_trang"],
                 "trang_thai": item["giao"] or "—",
                 "so_luong": item["so_bien"],
             }
@@ -406,33 +418,67 @@ def export_report_xlsx(
     rows = data["rows"]
 
     buf = io.BytesIO()
-    wb = xlsxwriter.Workbook(buf, {"in_memory": True, "constant_memory": True})
+    wb = xlsxwriter.Workbook(buf, {"in_memory": True})
     ws = wb.add_worksheet(code)
+
+    header_fmt = wb.add_format({
+        "bold": True,
+        "bg_color": "#1B365D",
+        "font_color": "#FFFFFF",
+        "border": 1,
+        "align": "center",
+        "valign": "vcenter",
+    })
+    cell_fmt = wb.add_format({"border": 1, "valign": "vcenter"})
+    cell_center = wb.add_format({"border": 1, "align": "center", "valign": "vcenter"})
+    cell_num = wb.add_format({"border": 1, "num_format": "#,##0", "align": "right", "valign": "vcenter"})
 
     if code == "R1":
         headers = ["STT", "NHÓM", "PHÂN LOẠI", "TRẠNG THÁI", "SỐ LƯỢNG"]
         keys = ["nhom", "phan_loai", "trang_thai", "so_luong"]
+        col_widths = [8, 16, 26, 26, 16]
+        alignments = ["center", "center", "left", "left", "right"]
     elif code == "R2":
         headers = ["STT", "MÃ TỈNH", "MÃ XÃ", "ĐƠN VỊ", "LOẠI PHƯƠNG TIỆN", "SERI CHỮ", "TÌNH TRẠNG", "SỐ BIỂN"]
         keys = ["tinh_ma", "xa_ma", "don_vi", "loai_pt", "seri_chu", "tinh_trang", "so_bien"]
+        col_widths = [8, 12, 14, 28, 20, 12, 18, 16]
+        alignments = ["center", "center", "center", "left", "left", "center", "left", "right"]
     elif code == "R3":
         headers = ["STT", "GIAI ĐOẠN", "TRẠNG THÁI LÔ", "SỐ LÔ", "SỐ BIỂN"]
         keys = ["giai_doan", "trang_thai_lo", "so_lo", "so_bien"]
+        col_widths = [8, 20, 36, 16, 16]
+        alignments = ["center", "left", "left", "right", "right"]
     elif code == "R4":
         headers = ["STT", "MÃ TỈNH", "MÃ XÃ", "ĐƠN VỊ", "CHƯA TRẢ", "ĐÃ TRẢ", "THU HỒI VỀ XÃ", "TỔNG SỐ"]
         keys = ["tinh_ma", "xa_ma", "don_vi", "chua_tra", "da_tra", "thu_hoi_ve_xa", "tong_so"]
+        col_widths = [8, 12, 14, 28, 16, 16, 16, 16]
+        alignments = ["center", "center", "center", "left", "right", "right", "right", "right"]
     else:
         headers = ["STT", "MÃ LÔ", "ĐƠN VỊ", "BIỂN SỐ ĐẦY ĐỦ", "LOẠI PHƯƠNG TIỆN", "MÀU SẮC", "TÌNH TRẠNG", "TRẠNG THÁI GIAO", "LÝ DO"]
         keys = ["ma_lo", "don_vi", "bien_so_day_du", "loai_pt", "mau_sac", "tinh_trang", "giao", "ly_do"]
+        col_widths = [8, 24, 28, 18, 18, 12, 16, 18, 36]
+        alignments = ["center", "left", "left", "center", "left", "center", "left", "left", "left"]
+
+    # Đặt chiều cao dòng tiêu đề & độ rộng các cột
+    ws.set_row(0, 26)
+    for col_idx, width in enumerate(col_widths):
+        ws.set_column(col_idx, col_idx, width)
 
     for col, h in enumerate(headers):
-        ws.write(0, col, h)
+        ws.write(0, col, h, header_fmt)
 
     for idx, row in enumerate(rows, start=1):
-        ws.write(idx, 0, idx)
+        ws.set_row(idx, 20)
+        ws.write(idx, 0, idx, cell_center)
         for col_offset, k in enumerate(keys, start=1):
             val = row.get(k)
-            ws.write(idx, col_offset, "" if val is None else val)
+            align = alignments[col_offset] if col_offset < len(alignments) else "left"
+            if align == "right" and isinstance(val, (int, float)):
+                ws.write_number(idx, col_offset, val, cell_num)
+            elif align == "center":
+                ws.write(idx, col_offset, "" if val is None else str(val), cell_center)
+            else:
+                ws.write(idx, col_offset, "" if val is None else str(val), cell_fmt)
 
     wb.close()
     buf.seek(0)
