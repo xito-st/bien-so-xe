@@ -178,3 +178,10 @@ def test_five_reports_r1_to_r5_and_xlsx_export_matching_counts_ac45(
     assert drill_tinh["total"] >= 1
     assert all(p["tinh_ma"] == "01" for p in drill_tinh["items"])
 
+    # Kiểm tra xuất Excel danh sách chi tiết biển số drill-down
+    resp_drill_xlsx = xa1.get("/api/v1/bao-cao/chi-tiet/bien/xuat", params={"xa_ma": "10105001", "loai_lo": "XA"})
+    assert resp_drill_xlsx.status_code == 200
+    assert resp_drill_xlsx.content[:2] == b"PK"
+    wb_drill = openpyxl.load_workbook(io.BytesIO(resp_drill_xlsx.content))
+    assert wb_drill.active.max_row - 1 == drill_xa["total"]
+

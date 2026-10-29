@@ -589,6 +589,7 @@ def get_report_drilldown_plates(
     seri_chu: str | None = None,
     tu_ngay: datetime | None = None,
     den_ngay: datetime | None = None,
+    q: str | None = None,
     limit: int = 500,
 ) -> list[dict]:
     """Truy vấn danh sách biển số chi tiết phục vụ tương tác trực tiếp (drill-down) trên bảng thống kê."""
@@ -607,6 +608,17 @@ def get_report_drilldown_plates(
         tu_ngay=tu_ngay,
         den_ngay=den_ngay,
     )
+
+    if q and q.strip():
+        q_up = q.strip().upper()
+        stmt = stmt.where(
+            or_(
+                Bien.bien_so_day_du.ilike(f"%{q_up}%"),
+                Lo.ma_lo.ilike(f"%{q_up}%"),
+                Bien.seri_chu.ilike(f"{q_up}%"),
+                LoaiPT.ten.ilike(f"%{q_up}%"),
+            )
+        )
 
     if xa_ma and xa_ma.strip():
         stmt = stmt.where(Bien.xa_ma == xa_ma.strip())
@@ -694,4 +706,109 @@ def get_report_drilldown_plates(
             }
         )
     return results
+
+
+def export_drilldown_plates_xlsx(
+    db: Session,
+    scope: ScopeFilter,
+    *,
+    tinh_ma: str | None = None,
+    xa_ma: str | None = None,
+    is_cap_tinh: bool = False,
+    loai_lo: str | None = None,
+    trang_thai_lo: str | None = None,
+    tinh_trang: str | None = None,
+    giao: str | None = None,
+    loai_pt: str | None = None,
+    seri_chu: str | None = None,
+    tu_ngay: datetime | None = None,
+    den_ngay: datetime | None = None,
+    q: str | None = None,
+    limit: int = 5000,
+) -> bytes:
+    """Xuất danh sách biển số chi tiết (drill-down) ra file .xlsx chuyên nghiệp."""
+    plates = get_report_drilldown_plates(
+        db,
+        scope,
+        tinh_ma=tinh_ma,
+        xa_ma=xa_ma,
+        is_cap_tinh=is_cap_tinh,
+        loai_lo=loai_lo,
+        trang_thai_lo=trang_thai_lo,
+        tinh_trang=tinh_trang,
+        giao=giao,
+        loai_pt=loai_pt,
+        seri_chu=seri_chu,
+        tu_ngay=tu_ngay,
+        den_ngay=den_ngay,
+        q=q,
+        limit=limit,
+    )
+
+    buf = io.BytesIO()
+    wb = xlsxwriter.Workbook(buf, {"in_memory": True})
+    ws = wb.add_worksheet("ChiTietBienSo")
+
+    header_fmt = wb.add_format({
+        "bold": True,
+        "bg_color": "#1B365D",
+        "font_color": "#FFFFFF",
+        "border": 1,
+        "align": "center",
+        "valign": "vcenter",
+    })
+    cell_fmt = wb.add_format({"border": 1, "valign": "vcenter"})
+    cell_center = wb.add_format({"border": 1, "align": "center", "valign": "vcenter"})
+    cell_bold_center = wb.add_format({"border": 1, "bold": True, "align": "center", "valign": "vcenter"})
+
+    headers = [
+        "STT",
+        "MÃ LÔ",
+        "MÃ LÔ ĐNM",
+        "ĐƠN VỊ",
+        "BIỂN SỐ ĐẦY ĐỦ",
+        "LOẠI PHƯƠNG TIỆN",
+        "MÀU SẮC",
+        "TÌNH TRẠNG KHO",
+        "TRẠNG THÁI GIAO",
+        "NGÀY TẠO",
+    ]
+    keys = [
+        "ma_lo",
+        "ma_lo_dnm",
+        "don_vi",
+        "bien_so_day_du",
+        "loai_pt",
+        "mau_sac",
+        "tinh_trang",
+        "giao",
+        "tao_luc",
+    ]
+    col_widths = [8, 22, 22, 28, 18, 26, 14, 18, 18, 20]
+    alignments = ["center", "center", "center", "left", "center", "left", "center", "center", "center", "center"]
+
+    ws.set_row(0, 26)
+    for col_idx, width in enumerate(col_widths):
+        ws.set_column(col_idx, col_idx, width)
+
+    for col, h in enumerate(headers):
+        ws.write(0, col, h, header_fmt)
+
+    for idx, p in enumerate(plates, start=1):
+        ws.set_row(idx, 20)
+        ws.write(idx, 0, idx, cell_center)
+        for col_offset, k in enumerate(keys, start=1):
+            val = p.get(k)
+            val_str = "" if val is None else str(val)
+            align = alignments[col_offset]
+            if k == "bien_so_day_du":
+                ws.write(idx, col_offset, val_str, cell_bold_center)
+            elif align == "center":
+                ws.write(idx, col_offset, val_str, cell_center)
+            else:
+                ws.write(idx, col_offset, val_str, cell_fmt)
+
+    wb.close()
+    buf.seek(0)
+    return buf.getvalue()
 

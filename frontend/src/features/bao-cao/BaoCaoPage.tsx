@@ -182,6 +182,20 @@ export function BaoCaoPage() {
     );
   }, [drilldownPlates, drilldownSearch]);
 
+  const drilldownExportUrl = useMemo(() => {
+    if (!selectedDrilldown) return "";
+    const qs = new URLSearchParams();
+    Object.entries(selectedDrilldown.params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "") {
+        qs.set(k, String(v));
+      }
+    });
+    if (drilldownSearch.trim()) {
+      qs.set("q", drilldownSearch.trim());
+    }
+    return `/api/v1/bao-cao/chi-tiet/bien/xuat?${qs.toString()}`;
+  }, [selectedDrilldown, drilldownSearch]);
+
   const fetchDrilldown = async (drilldown: SelectedDrilldown) => {
     setSelectedDrilldown(drilldown);
     setLoadingDrilldown(true);
@@ -1664,6 +1678,23 @@ export function BaoCaoPage() {
                       value={drilldownSearch}
                       onChange={(e) => setDrilldownSearch(e.target.value)}
                     />
+                    <a
+                      href={drilldownExportUrl}
+                      className="btn btn-success"
+                      download
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 13,
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        whiteSpace: "nowrap",
+                      }}
+                      title="Xuất toàn bộ danh sách biển số chi tiết ra file Excel (.xlsx)"
+                    >
+                      📥 Xuất Excel (.xlsx)
+                    </a>
                     <button
                       type="button"
                       className="btn btn-secondary"
