@@ -1,0 +1,76 @@
+services:
+  # -------------------------------------------------------------
+  # 1. Cơ sở dữ liệu PostgreSQL 17
+  # -------------------------------------------------------------
+  db:
+    image: postgres:17-alpine
+    container_name: biensoxe-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-BienSoXe@2026!Secure}
+      POSTGRES_DB: biensoxe_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d biensoxe_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - biensoxe-network
+
+  # -------------------------------------------------------------
+  # 2. Ứng dụng Backend FastAPI + Frontend React (SPA)
+  # -------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biensoxe-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-BienSoXe@2026!Secure}@db:5432/biensoxe_prod
+    expose:
+      - "8000"
+    networks:
+      - biensoxe-network
+
+  # -------------------------------------------------------------
+  # 3. Caddy Reverse Proxy (Tự động cấp chứng chỉ SSL Let's Encrypt)
+  # -------------------------------------------------------------
+  reverse-proxy:
+    image: caddy:2.9-alpine
+    container_name: biensoxe-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-:80}
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - biensoxe-network
+
+volumes:
+  postgres_data:
+    name: biensoxe_postgres_data
+  caddy_data:
+    name: biensoxe_caddy_data
+  caddy_config:
+    name: biensoxe_caddy_config
+
+networks:
+  biensoxe-network:
+    name: biensoxe-network
+    driver: bridge

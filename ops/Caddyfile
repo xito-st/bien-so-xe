@@ -1,9 +1,10 @@
-# Cấu hình mẫu Reverse Proxy TLS >= 1.2 (Caddyfile — NFR-008, NFR-009)
-biensoxe.internal.local {
-    tls internal {
-        protocols tls1.2 tls1.3
-    }
+# ==========================================================
+# Cấu hình Caddy Reverse Proxy (NFR-008, NFR-009)
+# Tự động cấp phát và gia hạn chứng chỉ HTTPS (Let's Encrypt)
+# ==========================================================
 
+{$DOMAIN_NAME::80} {
+    # Bảo mật HTTP Headers theo chuẩn NFR-009 / OWASP
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
@@ -12,10 +13,16 @@ biensoxe.internal.local {
         -Server
     }
 
+    # Giới hạn kích thước tải lên tối đa (hỗ trợ import file Excel 5.000 dòng theo NFR-002)
     request_body {
-        max_size 6MB
+        max_size 10MB
     }
 
-    reverse_proxy 127.0.0.1:8000
+    # Chuyển tiếp toàn bộ request đến container FastAPI
+    reverse_proxy app:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
-
