@@ -40,7 +40,7 @@ COPY backend/alembic.ini ./
 COPY backend/data ./data
 
 # Copy sản phẩm build frontend từ Giai đoạn 1 vào thư mục static của backend
-COPY --from=frontend-builder /app/backend/static ./static
+COPY --from=frontend-builder /app/frontend/dist ./static
 
 # Tạo user không đặc quyền để tăng cường bảo mật
 RUN useradd -m -u 1000 appuser && \
