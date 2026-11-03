@@ -33,3 +33,4 @@ fi
 # Dọn dẹp các bản sao lưu cũ hơn 30 ngày (đảm bảo NFR-006)
 find "$BACKUP_DIR" -type f -name "biensoxe_backup_*.dump" -mtime +30 -exec rm -f {} \;
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Đã dọn dẹp các bản sao lưu quá 30 ngày."
+

@@ -51,3 +51,4 @@ EXPOSE 8000
 
 # Khởi chạy Alembic migration và Web Server
 CMD ["sh", "-c", "alembic upgrade head && python -m biensoxe.cli serve --host 0.0.0.0 --port 8000"]
+
