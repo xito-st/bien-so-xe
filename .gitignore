@@ -14,6 +14,8 @@ __pycache__/
 .hypothesis/
 *.egg-info/
 dist/
+!frontend/dist/
+!frontend/dist/**
 build/
 .cache/
 *.tsbuildinfo
