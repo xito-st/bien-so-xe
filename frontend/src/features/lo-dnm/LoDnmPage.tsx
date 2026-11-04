@@ -108,7 +108,7 @@ export function LoDnmPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 16 }}>
+      <div className="split-layout-wide">
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Lập Lô đặt nhà máy mới</h3>
           <form onSubmit={handleCreateDnm}>

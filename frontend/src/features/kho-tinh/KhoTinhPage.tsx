@@ -170,7 +170,7 @@ export function KhoTinhPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 16 }}>
+      <div className="split-layout">
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Lô đặt nhà máy & Tiến độ nhập kho</h3>
           <table className="data-table">

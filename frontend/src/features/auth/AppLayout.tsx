@@ -262,50 +262,71 @@ export function TotpSetupModal() {
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [showChangePw, setShowChangePw] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (!user) return null;
 
+  const closeMenu = () => setMobileMenuOpen(false);
+
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <h2>QUẢN LÝ BIỂN SỐ XE (34 TỈNH/THÀNH)</h2>
+      {mobileMenuOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={closeMenu}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
+        <div className="sidebar-header">
+          <h2>QUẢN LÝ BIỂN SỐ XE (34 TỈNH/THÀNH)</h2>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={closeMenu}
+            aria-label="Đóng menu"
+          >
+            ✕
+          </button>
+        </div>
         {user.vai_tro === "XA" && (
           <>
-            <NavLink to="/lo-xa" className="nav-link">
+            <NavLink to="/lo-xa" className="nav-link" onClick={closeMenu}>
               Lô biển số của Xã/Phường
             </NavLink>
-            <NavLink to="/bien-xa" className="nav-link">
+            <NavLink to="/bien-xa" className="nav-link" onClick={closeMenu}>
               Biển đã nhận & Trả/Thu hồi/Hủy
             </NavLink>
           </>
         )}
         {user.vai_tro === "TINH" && (
           <>
-            <NavLink to="/lo-tinh" className="nav-link">
+            <NavLink to="/lo-tinh" className="nav-link" onClick={closeMenu}>
               Duyệt lô Xã & Quản lý Lô Tỉnh
             </NavLink>
-            <NavLink to="/lo-dnm" className="nav-link">
+            <NavLink to="/lo-dnm" className="nav-link" onClick={closeMenu}>
               Lô đặt nhà máy
             </NavLink>
-            <NavLink to="/kho-tinh" className="nav-link">
+            <NavLink to="/kho-tinh" className="nav-link" onClick={closeMenu}>
               Kho Tỉnh & Bàn giao Xã
             </NavLink>
-            <NavLink to="/tai-khoan-tinh" className="nav-link">
+            <NavLink to="/tai-khoan-tinh" className="nav-link" onClick={closeMenu}>
               Tài khoản Xã trực thuộc
             </NavLink>
           </>
         )}
         {user.vai_tro === "ADMIN" && (
           <>
-            <NavLink to="/admin" className="nav-link">
+            <NavLink to="/admin" className="nav-link" onClick={closeMenu}>
               Quản trị Tài khoản, Danh mục & Audit
             </NavLink>
           </>
         )}
-        <NavLink to="/tra-cuu" className="nav-link">
+        <NavLink to="/tra-cuu" className="nav-link" onClick={closeMenu}>
           Tra cứu biển số
         </NavLink>
-        <NavLink to="/bao-cao" className="nav-link">
+        <NavLink to="/bao-cao" className="nav-link" onClick={closeMenu}>
           Báo cáo thống kê (R1–R5)
         </NavLink>
       </aside>
@@ -318,13 +339,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
         )}
         <header className="topbar">
-          <div>
-            <strong>Tài khoản:</strong> {user.ten_dang_nhap} |{" "}
-            <strong>Vai trò:</strong> {user.vai_tro}
-            {user.tinh_ma ? ` | Mã tỉnh: ${user.tinh_ma}` : ""}
-            {user.xa_ma ? ` | Mã xã: ${user.xa_ma}` : ""}
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Mở menu điều hướng"
+            >
+              ☰
+            </button>
+            <div className="topbar-user-info">
+              <strong>Tài khoản:</strong> {user.ten_dang_nhap} |{" "}
+              <strong>Vai trò:</strong> {user.vai_tro}
+              {user.tinh_ma ? ` | Mã tỉnh: ${user.tinh_ma}` : ""}
+              {user.xa_ma ? ` | Mã xã: ${user.xa_ma}` : ""}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="topbar-actions">
             <button
               type="button"
               className="btn btn-secondary"

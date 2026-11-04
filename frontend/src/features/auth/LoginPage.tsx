@@ -88,10 +88,10 @@ export function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 24,
+        padding: "16px",
       }}
     >
-      <div className="card" style={{ width: 420, padding: 28 }}>
+      <div className="card login-card">
         <h2 style={{ marginTop: 0, marginBottom: 4 }}>
           Hệ thống Quản lý Biển số xe
         </h2>

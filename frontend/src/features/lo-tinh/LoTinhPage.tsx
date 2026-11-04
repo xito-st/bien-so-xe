@@ -300,7 +300,7 @@ export function LoTinhPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "430px 1fr", gap: 16 }}>
+      <div className="split-layout-wide">
         <div className="card">
           {tab === "LO_XA" ? (
             <div className="toolbar" style={{ justifyContent: "space-between" }}>

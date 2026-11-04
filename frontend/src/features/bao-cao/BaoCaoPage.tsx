@@ -748,7 +748,7 @@ export function BaoCaoPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
                   gap: 10,
                   textAlign: "center",
                 }}
